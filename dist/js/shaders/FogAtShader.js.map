@@ -1,0 +1,1 @@
+{"version":3,"file":"FogAtShader.js","sourceRoot":"","sources":["../../../src/shaders/FogAtShader.ts"],"names":[],"mappings":";;;AAAA,2CAAwC;AAExC,MAAa,WAAY,SAAQ,qBAAS;IACtC,QAAQ;QACJ,KAAK,CAAC,QAAQ,EAAE,CAAC;QAEjB,IAAI,CAAC,kBAAkB,GAAG;;;;;;;;cAQpB,qBAAS,CAAC,8BAA8B;;;;kBAIpC,qBAAS,CAAC,iBAAiB;;;;;;;cAO/B,CAAC;IACX,CAAC;CACJ;AAzBD,kCAyBC"}
