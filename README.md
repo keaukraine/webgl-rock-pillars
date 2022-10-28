@@ -1,3 +1,5 @@
+![image](https://user-images.githubusercontent.com/414072/198720864-1d811dad-5a99-45e7-a8d5-1fb18037de70.png)
+
 # Floating Islands WebGL Demo
 
 Live demo page is available here: https://keaukraine.github.io/webgl-rock-pillars/index.html
