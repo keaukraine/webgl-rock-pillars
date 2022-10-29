@@ -3973,6 +3973,16 @@ class Renderer extends BaseRenderer {
         const preset = this.PRESETS[this.currentPreset];
         this.gl.enable(this.gl.CULL_FACE);
         let shader;
+        shader = this.shaderFogAt;
+        shader.use();
+        this.gl.uniform1f(shader.fogStartDistance, this.fogStartDistance);
+        this.gl.uniform1f(shader.fogDistance, this.config.fogDistance);
+        this.gl.uniform2f(shader.heightFogParams, this.config.fogHeightOffset, this.config.fogHeightMultiplier);
+        this.setTexture2D(1, this.noTextures ? this.textureWhite : this.textureTrees, shader.sTexture);
+        this.gl.uniformMatrix4fv(shader.view_matrix, false, this.getViewMatrix());
+        this.setTextureCubemap(2, this.textureFogCubemap, shader.texCubemap);
+        this.gl.uniform2f(shader.heightOffset, 0, -this.config.treesHeightOffset);
+        this.drawInstances(shader, this.fmTree, this.textureTreesPositions, TREES_COUNT, [0.003, 0.003], [0, 0, 0]);
         shader = this.shaderFogVertexLitGrass;
         shader.use();
         this.gl.uniform1f(shader.fogStartDistance, this.fogStartDistance);
@@ -4002,11 +4012,9 @@ class Renderer extends BaseRenderer {
         this.gl.uniform1f(shader.fogStartDistance, this.fogStartDistance);
         this.gl.uniform1f(shader.fogDistance, this.config.fogDistance);
         this.gl.uniform2f(shader.heightFogParams, this.config.fogHeightOffset, this.config.fogHeightMultiplier);
-        this.setTexture2D(1, this.noTextures ? this.textureWhite : this.textureTrees, shader.sTexture);
         this.gl.uniformMatrix4fv(shader.view_matrix, false, this.getViewMatrix());
         this.setTextureCubemap(2, this.textureFogCubemap, shader.texCubemap);
         this.gl.uniform2f(shader.heightOffset, 0, -this.config.treesHeightOffset);
-        this.drawInstances(shader, this.fmTree, this.textureTreesPositions, TREES_COUNT, [0.003, 0.003], [0, 0, 0]);
         this.setTexture2D(1, this.noTextures ? this.textureWhite : this.textureFern, shader.sTexture);
         this.gl.uniform2f(shader.heightOffset, this.config.heightOffset, this.config.heightOffset * 0.25);
         this.drawInstances(shader, this.fmRock1Grass, this.textureRocksPositions1, ROCKS1_COUNT, [0.0055, 0.004]);
