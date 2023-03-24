@@ -4,6 +4,9 @@
 
 Live demo page is available here: https://keaukraine.github.io/webgl-rock-pillars/index.html
 
+Article explaining rendering pipeline and optimizations used in this demo: https://keaukraine.medium.com/floating-islands-webgl-demo-3bba99a004ee
+
+
 Works in latest Chrome, Firefox, Safari and Edge.
 
 # Used Libraries
