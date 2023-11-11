@@ -1,4 +1,6 @@
+import { RendererWithExposedMethods } from "webgl-framework/dist/types/RendererWithExposedMethods";
 import { CameraPositionInterpolator } from "./CameraPositionInterpolator";
+import { mat4 } from "gl-matrix";
 
 const mainRadius = 120;
 const spikeLength1 = 16;
@@ -11,7 +13,19 @@ const splineAmplitudeZ1 = 1;
 const splineAmplitudeZ2 = 3;
 const cameraHeightOffset = 7;
 
-const transientSplinePosition: [number, number, number] = [0,0,0];
+const matrixTemp = mat4.create();
+
+const calculateModelMatrix = (tx: number, ty: number, tz: number, rx: number, ry: number, rz: number, sx: number, sy: number, sz: number) => {
+    mat4.identity(matrixTemp);
+    mat4.rotate(matrixTemp, matrixTemp, 0, [1, 0, 0]);
+    mat4.translate(matrixTemp, matrixTemp, [tx, ty, tz]);
+    mat4.scale(matrixTemp, matrixTemp, [sx, sy, sz]);
+    mat4.rotateX(matrixTemp, matrixTemp, rx);
+    mat4.rotateY(matrixTemp, matrixTemp, ry);
+    mat4.rotateZ(matrixTemp, matrixTemp, rz);
+}
+
+const transientSplinePosition: [number, number, number] = [0, 0, 0];
 export function positionOnSpline(i: number, radiusOffset: number, out?: number[]): [number, number, number] {
     const a = Math.PI * 2 * i;
     const a2 = a * numSpikesXY1;
@@ -25,9 +39,9 @@ export function positionOnSpline(i: number, radiusOffset: number, out?: number[]
     let z = splineAmplitudeZ1 * Math.sin(a4) + splineAmplitudeZ2 * Math.sin(a5);
     z += cameraHeightOffset;
 
-    transientSplinePosition[0]=Math.sin(a) * radius;
-    transientSplinePosition[1]=Math.cos(a) * radius;
-    transientSplinePosition[2]=z;
+    transientSplinePosition[0] = Math.sin(a) * radius;
+    transientSplinePosition[1] = Math.cos(a) * radius;
+    transientSplinePosition[2] = z;
 
     if (out !== undefined) {
         out[0] = transientSplinePosition[0];
@@ -59,30 +73,47 @@ export function addPositions(
 
 let positions: number[][] = [];
 
-function initPositions(instances: number, minDistance: number, offset: number): [texture: Float32Array, instances: number] {
+function initPositions(instances: number, minDistance: number, offset: number): [texture: Float32Array, instances: number, matrices: number[]] {
     positions = [];
+    const matrices: number[][] = [];
 
     addPositions(positions, instances, minDistance, offset); // further from spline
 
     const texture = new Float32Array(positions.length * 6);
     for (let i = 0; i < positions.length; i++) {
         const [x, y, z] = positions[i];
+        const scale = 0.003 + Math.random() * 0.003;
+        // const scale = 0.06;
         texture[i * 3 + 0] = x; // translation X
         texture[i * 3 + 1] = y; // translation Y
-        texture[i * 3 + 2] = Math.random(); // scale
+        texture[i * 3 + 2] = scale; // scale
         const a = Math.random() * Math.PI * 2;
         texture[i * 3 + 0 + positions.length * 3] = Math.sin(a); // rotation sin
         texture[i * 3 + 1 + positions.length * 3] = Math.cos(a); // rotation cos
         texture[i * 3 + 2 + positions.length * 3] = 0;
+
+        calculateModelMatrix(
+            x, y, 0,
+            0, 0, a,
+            scale, scale, scale
+        );
+        // calculateModelMatrix(
+        //     0, 0, 0,
+        //     0, 0, a,
+        //     1, 1, 1
+        // );
+        // mat4.identity(matrixTemp);
+        matrices.push([...matrixTemp]);
     }
 
     return [
         texture,
-        positions.length
+        positions.length,
+        (matrices as any).flat() // FIXME
     ];
 }
 
-const transientBirdsPosition: [number, number, number] = [0,0,0];
+const transientBirdsPosition: [number, number, number] = [0, 0, 0];
 export function positionOnBirdsSpline(i: number): [number, number, number] {
     const a = Math.PI * 2 * i;
     const a2 = a * numSpikesXY1;
@@ -95,9 +126,9 @@ export function positionOnBirdsSpline(i: number): [number, number, number] {
     let z = splineAmplitudeZ1 * Math.sin(a4) + splineAmplitudeZ2 * Math.sin(a5);
     z += 56;
 
-    transientBirdsPosition[0]=Math.sin(a * 4) * radius;
-    transientBirdsPosition[1]=Math.cos(a * 6) * radius;
-    transientBirdsPosition[2]=z;
+    transientBirdsPosition[0] = Math.sin(a * 4) * radius;
+    transientBirdsPosition[1] = Math.cos(a * 6) * radius;
+    transientBirdsPosition[2] = z;
     return transientBirdsPosition;
 };
 
@@ -106,7 +137,7 @@ export const [ROCKS2_TEXTURE, ROCKS2_COUNT] = initPositions(119, 0.72, 25);
 export const [ROCKS3_TEXTURE, ROCKS3_COUNT] = initPositions(60, 0.75, 60); // outer, large, non-floating
 export const [ROCKS4_TEXTURE, ROCKS4_COUNT] = initPositions(40, 0, 10); // central tall floating
 export const [ROCKS5_TEXTURE, ROCKS5_COUNT] = initPositions(70, 0, 30); // central non-floating
-export const [TREES_TEXTURE, TREES_COUNT] = initPositions(1360, 0.0, 60);
+export const [TREES_TEXTURE, TREES_COUNT, TREES_XFORM] = initPositions(1360, 0.0, 60);
 export const [PARTICLES_TEXTURE, PARTICLES_COUNT] = initPositions(40, 0.0, 40);
 
 const birds1 = new CameraPositionInterpolator();
@@ -115,12 +146,12 @@ birds1.speed = 1000;
 birds1.minDuration = 20000 / 1.3;
 birds1.position = {
     start: {
-        position: new Float32Array([-21.162155151367188,257.8841247558594,45]),
-        rotation: new Float32Array([0.09479612112045288,3.1140060424804688,0])
+        position: new Float32Array([-21.162155151367188, 257.8841247558594, 45]),
+        rotation: new Float32Array([0.09479612112045288, 3.1140060424804688, 0])
     },
     end: {
-        position: new Float32Array([13.270217895507812,-567.8276977539062,47]),
-        rotation: new Float32Array([0.09479612112045288,3.1140060424804688,0])
+        position: new Float32Array([13.270217895507812, -567.8276977539062, 47]),
+        rotation: new Float32Array([0.09479612112045288, 3.1140060424804688, 0])
     },
 };
 
@@ -160,12 +191,12 @@ birds4.speed = 1000;
 birds4.minDuration = 22000 / 1.3;
 birds4.position = {
     start: {
-        position: new Float32Array([-167.41603088378906,-272.6703796386719,44]),
-        rotation: new Float32Array([0.09000006318092346,0.9119994640350342,0])
+        position: new Float32Array([-167.41603088378906, -272.6703796386719, 44]),
+        rotation: new Float32Array([0.09000006318092346, 0.9119994640350342, 0])
     },
     end: {
-        position: new Float32Array([213.55006408691406,31.966976165771484,44]),
-        rotation: new Float32Array([0.09000006318092346,0.9119994640350342,0])
+        position: new Float32Array([213.55006408691406, 31.966976165771484, 44]),
+        rotation: new Float32Array([0.09000006318092346, 0.9119994640350342, 0])
     }
 };
 
@@ -175,12 +206,12 @@ birds5.speed = 1000;
 birds5.minDuration = 27000 / 1.3;
 birds5.position = {
     start: {
-        position: new Float32Array([249.5919189453125,274.224365234375,45]),
-        rotation: new Float32Array([0.12599891424179077,4.177173137664795,0])
+        position: new Float32Array([249.5919189453125, 274.224365234375, 45]),
+        rotation: new Float32Array([0.12599891424179077, 4.177173137664795, 0])
     },
     end: {
-        position: new Float32Array([-359.8509216308594,-126.64541625976562,46]),
-        rotation: new Float32Array([0.03599891439080238,0.9239869713783264,0])
+        position: new Float32Array([-359.8509216308594, -126.64541625976562, 46]),
+        rotation: new Float32Array([0.03599891439080238, 0.9239869713783264, 0])
     },
 };
 

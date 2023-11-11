@@ -16,7 +16,8 @@ import {
     ROCKS5_COUNT,
     ROCKS5_TEXTURE,
     TREES_COUNT,
-    TREES_TEXTURE
+    TREES_TEXTURE,
+    TREES_XFORM
 } from "./ObjectsPlacement";
 import { FogShader } from "./shaders/FogShader";
 import { FogAtShader } from "./shaders/FogAtShader";
@@ -24,6 +25,8 @@ import { SkyShader } from "./shaders/SkyShader";
 import { BirdsShader } from "./shaders/BirdsShader";
 import { FogVertexLitGrassShader } from "./shaders/FogVertexLitGrassShader";
 import { FogSpriteShader } from "./shaders/FogSpriteShader";
+import { InstancedShader } from "./shaders/InstancedShader";
+import { InstancedColoredShader } from "./shaders/InstancedColoredShader";
 
 const FOV_LANDSCAPE = 60.0; // FOV for landscape
 const FOV_PORTRAIT = 70.0; // FOV for portrait
@@ -64,6 +67,8 @@ export class Renderer extends BaseRenderer {
     private textureCloud: WebGLTexture | undefined;
     private textureWhite: WebGLTexture | undefined;
 
+    private bufferTreesMatrices: WebGLBuffer | null = null;
+
     private fboOffscreen: FrameBuffer | undefined;
 
     private mQuadTriangles: Float32Array | undefined;
@@ -76,6 +81,9 @@ export class Renderer extends BaseRenderer {
     private shaderBirds: BirdsShader | undefined;
     private shaderFogVertexLitGrass: FogVertexLitGrassShader | undefined;
     private shaderFogSprite: FogSpriteShader | undefined;
+
+    private shaderInstanced: InstancedShader | undefined;
+    private shaderInstancedColored: InstancedColoredShader | undefined;
 
     private animationBird = new CombinedAnimation(5);
 
@@ -207,6 +215,9 @@ export class Renderer extends BaseRenderer {
         this.shaderSky = new SkyShader(this.gl);
         this.shaderBirds = new BirdsShader(this.gl);
         this.shaderFogSprite = new FogSpriteShader(this.gl);
+
+        this.shaderInstanced = new InstancedShader(this.gl);
+        this.shaderInstancedColored = new InstancedColoredShader(this.gl);
     }
 
     protected loadFp32Texture(
@@ -268,6 +279,8 @@ export class Renderer extends BaseRenderer {
         this.initOffscreen();
         this.initVignette();
 
+        const gl = this.gl as WebGL2RenderingContext;
+
         await Promise.all([
             this.fmSky.load("data/models/sky", this.gl),
             this.fmRock1.load("data/models/rock-8", this.gl), // pillar
@@ -296,6 +309,11 @@ export class Renderer extends BaseRenderer {
         this.textureRocksPositions4 = loadPositionsTexture(ROCKS4_TEXTURE, ROCKS4_COUNT);
         this.textureRocksPositions5 = loadPositionsTexture(ROCKS5_TEXTURE, ROCKS5_COUNT);
         this.textureTreesPositions = loadPositionsTexture(TREES_TEXTURE, TREES_COUNT);
+
+        // console.log(TREES_XFORM);
+        this.bufferTreesMatrices = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.bufferTreesMatrices);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(TREES_XFORM), gl.STATIC_DRAW);
 
         [
             this.textureRocks,
@@ -587,6 +605,7 @@ export class Renderer extends BaseRenderer {
             || this.shaderFogAt === undefined
             || this.shaderFogSprite === undefined
             || this.shaderDiffuse === undefined
+            || this.shaderInstanced === undefined
         ) {
             console.log("undefined shaders");
             return;
@@ -598,21 +617,28 @@ export class Renderer extends BaseRenderer {
 
         let shader: FogShader;
 
-        shader = this.shaderFogAt;
-        shader.use();
-        this.gl.uniform1f(shader.fogStartDistance!, this.fogStartDistance);
-        this.gl.uniform1f(shader.fogDistance!, this.config.fogDistance);
-        this.gl.uniform2f(shader.heightFogParams!, this.config.fogHeightOffset, this.config.fogHeightMultiplier);
-        this.setTexture2D(1, this.noTextures ? this.textureWhite! : this.textureTrees!, shader.sTexture!);
-        this.gl.uniformMatrix4fv(shader.view_matrix!, false, this.getViewMatrix());
-        this.setTextureCubemap(2, this.textureFogCubemap!, shader.texCubemap!);
-        this.gl.uniform2f(shader.heightOffset!, 0, -this.config.treesHeightOffset);
-        this.drawInstances(
-            shader,
-            this.fmTree, this.textureTreesPositions!, TREES_COUNT,
-            [0.003, 0.003],
-            [0, 0, 0]
-        );
+        // shader = this.shaderFogAt;
+        // shader.use();
+        // this.gl.uniform1f(shader.fogStartDistance!, this.fogStartDistance);
+        // this.gl.uniform1f(shader.fogDistance!, this.config.fogDistance);
+        // this.gl.uniform2f(shader.heightFogParams!, this.config.fogHeightOffset, this.config.fogHeightMultiplier);
+        // this.setTexture2D(1, this.noTextures ? this.textureWhite! : this.textureTrees!, shader.sTexture!);
+        // this.gl.uniformMatrix4fv(shader.view_matrix!, false, this.getViewMatrix());
+        // this.setTextureCubemap(2, this.textureFogCubemap!, shader.texCubemap!);
+        // this.gl.uniform2f(shader.heightOffset!, 0, -this.config.treesHeightOffset);
+        // this.drawInstances(
+        //     shader,
+        //     this.fmTree, this.textureTreesPositions!, TREES_COUNT,
+        //     [0.003, 0.003],
+        //     [0, 0, 0]
+        // );
+
+        this.shaderInstanced.use();
+        this.setTexture2D(1, this.noTextures ? this.textureWhite! : this.textureTrees!, this.shaderInstanced.sTexture!);
+        // this.shaderInstanced.drawInstanced(this, this.fmTree, this.bufferTreesMatrices!, 0, TREES_COUNT);
+        this.shaderInstanced.drawModel(this, this.fmTree, this.bufferTreesMatrices!);
+        this.shaderInstanced.drawInstanced(this, this.fmTree, this.bufferTreesMatrices!, 0, TREES_COUNT);
+        // TODO: use this.config.treesHeightOffset when generating tree matrices
 
         shader = this.shaderFogVertexLitGrass;
         shader.use();

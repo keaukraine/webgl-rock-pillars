@@ -13,7 +13,7 @@
   "dependencies": {
     "dat.gui": "^0.7.9",
     "quaternion-to-euler": "^0.5.0",
-    "webgl-framework": "^2.1.8"
+    "webgl-framework": "^2.2.2"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^11.0.2",

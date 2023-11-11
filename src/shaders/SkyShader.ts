@@ -48,7 +48,7 @@ export class SkyShader extends BaseShader implements DrawableShader {
             return;
         }
 
-        const gl = renderer.gl;
+        const gl = renderer.gl as WebGL2RenderingContext;
 
         model.bindBuffers(gl);
 
@@ -56,6 +56,8 @@ export class SkyShader extends BaseShader implements DrawableShader {
         // gl.enableVertexAttribArray(this.rm_TexCoord0);
         gl.vertexAttribPointer(this.rm_Vertex, 3, gl.FLOAT, false, 4 * (3 + 2), 0);
         // gl.vertexAttribPointer(this.rm_TexCoord0, 2, gl.FLOAT, false, 4 * (3 + 2), 4 * 3);
+
+        // gl.vertexAttribDivisor(this.rm_Vertex, 0);
 
         renderer.calculateMVPMatrix(tx, ty, tz, rx, ry, rz, sx, sy, sz);
 

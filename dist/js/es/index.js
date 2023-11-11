@@ -1,3 +1,5 @@
+
+(function(l, r) { if (l.getElementById('livereloadscript')) return; r = l.createElement('script'); r.async = 1; r.src = '//' + (window.location.host || 'localhost').split(':')[0] + ':35729/livereload.js?snipver=1'; r.id = 'livereloadscript'; l.getElementsByTagName('head')[0].appendChild(r) })(window.document);
 class FullScreenUtils {
     /** Enters fullscreen. */
     enterFullScreen() {
@@ -1521,6 +1523,10 @@ class BaseRenderer {
     getViewMatrix() {
         return this.mVMatrix;
     }
+    /** @inheritdoc */
+    getProjectionMatrix() {
+        return this.mProjMatrix;
+    }
 }
 
 class FrameBuffer {
@@ -1668,12 +1674,6 @@ class TextureUtils {
 }
 
 class CombinedAnimation {
-    constructor(frames) {
-        this.frames = frames;
-        this.start = 0;
-        this.end = 0;
-        this.currentCoeff = 0;
-    }
     getStart() {
         return this.start;
     }
@@ -1685,6 +1685,12 @@ class CombinedAnimation {
     }
     getCurrentCoeff() {
         return this.currentCoeff;
+    }
+    constructor(frames) {
+        this.frames = frames;
+        this.start = 0;
+        this.end = 0;
+        this.currentCoeff = 0;
     }
     clamp(i, low, high) {
         return Math.max(Math.min(i, high), low);
@@ -1699,6 +1705,9 @@ class CombinedAnimation {
     }
 }
 
+/**
+ * Simple shader using one texture.
+ */
 class DiffuseShader extends BaseShader {
     /** @inheritdoc */
     fillCode() {
@@ -1727,7 +1736,7 @@ class DiffuseShader extends BaseShader {
         this.sTexture = this.getUniform('sTexture');
     }
     /** @inheritdoc */
-    drawModel(renderer, model, tx, ty, tz, rx, ry, rz, sx, sy, sz) {
+    drawModel(renderer, model, tx, ty, tz, rx, ry, rz, sx, sy, sz, attribs) {
         if (this.rm_Vertex === undefined || this.rm_TexCoord0 === undefined || this.view_proj_matrix === undefined) {
             return;
         }
@@ -1735,13 +1744,44 @@ class DiffuseShader extends BaseShader {
         model.bindBuffers(gl);
         gl.enableVertexAttribArray(this.rm_Vertex);
         gl.enableVertexAttribArray(this.rm_TexCoord0);
-        gl.vertexAttribPointer(this.rm_Vertex, 3, gl.FLOAT, false, 4 * (3 + 2), 0);
-        gl.vertexAttribPointer(this.rm_TexCoord0, 2, gl.FLOAT, false, 4 * (3 + 2), 4 * 3);
+        if (attribs) {
+            for (const [key, value] of attribs) {
+                gl.vertexAttribPointer(key, ...value);
+            }
+        }
+        else {
+            gl.vertexAttribPointer(this.rm_Vertex, 3, gl.FLOAT, false, 4 * (3 + 2), 0);
+            gl.vertexAttribPointer(this.rm_TexCoord0, 2, gl.FLOAT, false, 4 * (3 + 2), 4 * 3);
+        }
         renderer.calculateMVPMatrix(tx, ty, tz, rx, ry, rz, sx, sy, sz);
         gl.uniformMatrix4fv(this.view_proj_matrix, false, renderer.getMVPMatrix());
         gl.drawElements(gl.TRIANGLES, model.getNumIndices() * 3, gl.UNSIGNED_SHORT, 0);
         renderer.checkGlError("DiffuseShader glDrawElements");
     }
+}
+
+/*! *****************************************************************************
+Copyright (c) Microsoft Corporation. All rights reserved.
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. You may obtain a copy of the
+License at http://www.apache.org/licenses/LICENSE-2.0
+
+THIS CODE IS PROVIDED ON AN *AS IS* BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, EITHER EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION ANY IMPLIED
+WARRANTIES OR CONDITIONS OF TITLE, FITNESS FOR A PARTICULAR PURPOSE,
+MERCHANTABLITY OR NON-INFRINGEMENT.
+
+See the Apache Version 2.0 License for specific language governing permissions
+and limitations under the License.
+***************************************************************************** */
+
+function __awaiter(thisArg, _arguments, P, generator) {
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
 }
 
 /**
@@ -2058,6 +2098,86 @@ function scale$1(out, a, v) {
   out[13] = a[13];
   out[14] = a[14];
   out[15] = a[15];
+  return out;
+}
+/**
+ * Rotates a mat4 by the given angle around the given axis
+ *
+ * @param {mat4} out the receiving matrix
+ * @param {ReadonlyMat4} a the matrix to rotate
+ * @param {Number} rad the angle to rotate the matrix by
+ * @param {ReadonlyVec3} axis the axis to rotate around
+ * @returns {mat4} out
+ */
+
+function rotate(out, a, rad, axis) {
+  var x = axis[0],
+      y = axis[1],
+      z = axis[2];
+  var len = Math.hypot(x, y, z);
+  var s, c, t;
+  var a00, a01, a02, a03;
+  var a10, a11, a12, a13;
+  var a20, a21, a22, a23;
+  var b00, b01, b02;
+  var b10, b11, b12;
+  var b20, b21, b22;
+
+  if (len < EPSILON) {
+    return null;
+  }
+
+  len = 1 / len;
+  x *= len;
+  y *= len;
+  z *= len;
+  s = Math.sin(rad);
+  c = Math.cos(rad);
+  t = 1 - c;
+  a00 = a[0];
+  a01 = a[1];
+  a02 = a[2];
+  a03 = a[3];
+  a10 = a[4];
+  a11 = a[5];
+  a12 = a[6];
+  a13 = a[7];
+  a20 = a[8];
+  a21 = a[9];
+  a22 = a[10];
+  a23 = a[11]; // Construct the elements of the rotation matrix
+
+  b00 = x * x * t + c;
+  b01 = y * x * t + z * s;
+  b02 = z * x * t - y * s;
+  b10 = x * y * t - z * s;
+  b11 = y * y * t + c;
+  b12 = z * y * t + x * s;
+  b20 = x * z * t + y * s;
+  b21 = y * z * t - x * s;
+  b22 = z * z * t + c; // Perform rotation-specific matrix multiplication
+
+  out[0] = a00 * b00 + a10 * b01 + a20 * b02;
+  out[1] = a01 * b00 + a11 * b01 + a21 * b02;
+  out[2] = a02 * b00 + a12 * b01 + a22 * b02;
+  out[3] = a03 * b00 + a13 * b01 + a23 * b02;
+  out[4] = a00 * b10 + a10 * b11 + a20 * b12;
+  out[5] = a01 * b10 + a11 * b11 + a21 * b12;
+  out[6] = a02 * b10 + a12 * b11 + a22 * b12;
+  out[7] = a03 * b10 + a13 * b11 + a23 * b12;
+  out[8] = a00 * b20 + a10 * b21 + a20 * b22;
+  out[9] = a01 * b20 + a11 * b21 + a21 * b22;
+  out[10] = a02 * b20 + a12 * b21 + a22 * b22;
+  out[11] = a03 * b20 + a13 * b21 + a23 * b22;
+
+  if (a !== out) {
+    // If the source and destination differ, copy the unchanged last row
+    out[12] = a[12];
+    out[13] = a[13];
+    out[14] = a[14];
+    out[15] = a[15];
+  }
+
   return out;
 }
 /**
@@ -2576,7 +2696,7 @@ class CameraPositionInterpolator {
         }
         const start = this.position.start.position;
         const end = this.position.end.position;
-        return Math.sqrt((end[0] - start[0]) ** 2 + (end[1] - start[1]) ** 2 + (end[2] - start[2]) ** 2);
+        return Math.sqrt(Math.pow((end[0] - start[0]), 2) + Math.pow((end[1] - start[1]), 2) + Math.pow((end[2] - start[2]), 2));
     }
     iterate(timeNow) {
         if (this.lastTime != 0) {
@@ -2623,6 +2743,16 @@ const numSpikesZ2 = 8;
 const splineAmplitudeZ1 = 1;
 const splineAmplitudeZ2 = 3;
 const cameraHeightOffset = 7;
+const matrixTemp = create$1();
+const calculateModelMatrix = (tx, ty, tz, rx, ry, rz, sx, sy, sz) => {
+    identity(matrixTemp);
+    rotate(matrixTemp, matrixTemp, 0, [1, 0, 0]);
+    translate(matrixTemp, matrixTemp, [tx, ty, tz]);
+    scale$1(matrixTemp, matrixTemp, [sx, sy, sz]);
+    rotateX(matrixTemp, matrixTemp, rx);
+    rotateY(matrixTemp, matrixTemp, ry);
+    rotateZ(matrixTemp, matrixTemp, rz);
+};
 const transientSplinePosition = [0, 0, 0];
 function positionOnSpline(i, radiusOffset, out) {
     const a = Math.PI * 2 * i;
@@ -2661,21 +2791,33 @@ function addPositions(positions, instances, minDistance, offset) {
 let positions = [];
 function initPositions(instances, minDistance, offset) {
     positions = [];
+    const matrices = [];
     addPositions(positions, instances, minDistance, offset); // further from spline
     const texture = new Float32Array(positions.length * 6);
     for (let i = 0; i < positions.length; i++) {
         const [x, y, z] = positions[i];
+        const scale = 0.003 + Math.random() * 0.003;
+        // const scale = 0.06;
         texture[i * 3 + 0] = x; // translation X
         texture[i * 3 + 1] = y; // translation Y
-        texture[i * 3 + 2] = Math.random(); // scale
+        texture[i * 3 + 2] = scale; // scale
         const a = Math.random() * Math.PI * 2;
         texture[i * 3 + 0 + positions.length * 3] = Math.sin(a); // rotation sin
         texture[i * 3 + 1 + positions.length * 3] = Math.cos(a); // rotation cos
         texture[i * 3 + 2 + positions.length * 3] = 0;
+        calculateModelMatrix(x, y, 0, 0, 0, a, scale, scale, scale);
+        // calculateModelMatrix(
+        //     0, 0, 0,
+        //     0, 0, a,
+        //     1, 1, 1
+        // );
+        // mat4.identity(matrixTemp);
+        matrices.push([...matrixTemp]);
     }
     return [
         texture,
-        positions.length
+        positions.length,
+        matrices.flat() // FIXME
     ];
 }
 const [ROCKS1_TEXTURE, ROCKS1_COUNT] = initPositions(97, 0.7, 23);
@@ -2683,7 +2825,7 @@ const [ROCKS2_TEXTURE, ROCKS2_COUNT] = initPositions(119, 0.72, 25);
 const [ROCKS3_TEXTURE, ROCKS3_COUNT] = initPositions(60, 0.75, 60); // outer, large, non-floating
 const [ROCKS4_TEXTURE, ROCKS4_COUNT] = initPositions(40, 0, 10); // central tall floating
 const [ROCKS5_TEXTURE, ROCKS5_COUNT] = initPositions(70, 0, 30); // central non-floating
-const [TREES_TEXTURE, TREES_COUNT] = initPositions(1360, 0.0, 60);
+const [TREES_TEXTURE, TREES_COUNT, TREES_XFORM] = initPositions(1360, 0.0, 60);
 const [PARTICLES_TEXTURE, PARTICLES_COUNT] = initPositions(40, 0.0, 40);
 const birds1 = new CameraPositionInterpolator();
 birds1.reverse = true;
@@ -3169,6 +3311,7 @@ class SkyShader extends BaseShader {
         // gl.enableVertexAttribArray(this.rm_TexCoord0);
         gl.vertexAttribPointer(this.rm_Vertex, 3, gl.FLOAT, false, 4 * (3 + 2), 0);
         // gl.vertexAttribPointer(this.rm_TexCoord0, 2, gl.FLOAT, false, 4 * (3 + 2), 4 * 3);
+        // gl.vertexAttribDivisor(this.rm_Vertex, 0);
         renderer.calculateMVPMatrix(tx, ty, tz, rx, ry, rz, sx, sy, sz);
         gl.uniformMatrix4fv(this.view_proj_matrix, false, renderer.getMVPMatrix());
         gl.uniformMatrix4fv(this.view_matrix, false, renderer.getViewMatrix());
@@ -3540,6 +3683,159 @@ class FogSpriteShader extends DiffuseShader {
     }
 }
 
+class InstancedShader extends BaseShader {
+    fillCode() {
+        this.vertexShaderCode = `#version 300 es
+            precision highp float;
+
+            ${InstancedShader.COMMON_UNIFORMS_ATTRIBUTES}
+
+            in mediump vec2 rm_TexCoord0;
+            in vec4 rm_Vertex;
+            out mediump vec2 vTexCoord;
+
+            void main(void) {
+                ${InstancedShader.COMMON_TRANSFORMS}
+
+                gl_Position = view_proj_matrix * rm_Vertex;
+                vTexCoord = rm_TexCoord0;
+            }`;
+        this.fragmentShaderCode = `#version 300 es
+            precision mediump float;
+            uniform sampler2D sTexture;
+
+            in mediump vec2 vTexCoord;
+            out vec4 fragColor;
+
+            void main(void) {
+                fragColor = texture(sTexture, vTexCoord);
+                fragColor.r = 1.; // FIXME
+            }`;
+    }
+    fillUniformsAttributes() {
+        this.viewMatrix = this.getUniform("viewMatrix");
+        this.projMatrix = this.getUniform("projMatrix");
+        this.modelMatrix = this.getAttrib("modelMatrix");
+        this.sTexture = this.getUniform("sTexture");
+        this.rm_TexCoord0 = this.getAttrib("rm_TexCoord0");
+        this.rm_Vertex = this.getAttrib("rm_Vertex");
+    }
+    /** @inheritdoc */
+    drawModel(renderer, model, bufferMatrices) {
+        // throw new Error("Not implemented");
+        if (this.rm_Vertex === undefined
+            || this.rm_TexCoord0 === undefined
+            || this.modelMatrix === undefined) {
+            return;
+        }
+        const gl = renderer.gl;
+        model.bindBuffers(gl);
+        gl.enableVertexAttribArray(this.rm_Vertex);
+        gl.enableVertexAttribArray(this.rm_TexCoord0);
+        gl.vertexAttribPointer(this.rm_Vertex, 3, gl.HALF_FLOAT, false, 12, 0);
+        gl.vertexAttribPointer(this.rm_TexCoord0, 2, gl.HALF_FLOAT, false, 12, 6);
+        gl.bindBuffer(gl.ARRAY_BUFFER, bufferMatrices);
+        // gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+        // set all 4 attributes for matrix
+        const bytesPerMatrix = 4 * 16;
+        for (let i = 0; i < 4; ++i) {
+            const loc = this.modelMatrix + i;
+            gl.enableVertexAttribArray(loc);
+            // note the stride and offset
+            const offset = i * 16; // 4 floats per row, 4 bytes per float
+            gl.vertexAttribPointer(loc, // location
+            4, // size (num values to pull from buffer per iteration)
+            gl.FLOAT, // type of data in buffer
+            false, // normalize
+            bytesPerMatrix, // stride, num bytes to advance to get to next set of values
+            offset);
+            // this line says this attribute only changes for each 1 instance
+            gl.vertexAttribDivisor(loc, 1);
+            // TODO: this also breaks rendering of all other (non-instanced) objects
+        }
+        // gl.vertexAttribDivisor(this.rm_Vertex, 0);
+        // gl.vertexAttribDivisor(this.rm_TexCoord0, 0);
+        // renderer.calculateMVPMatrix(0, 0, 0, 0, 0, 0, 1, 1, 1);
+        gl.uniformMatrix4fv(this.viewMatrix, false, renderer.getViewMatrix());
+        gl.uniformMatrix4fv(this.projMatrix, false, renderer.getProjectionMatrix());
+        gl.drawElements(gl.TRIANGLES, model.getNumIndices() * 3, gl.UNSIGNED_SHORT, 0);
+        // Reset attrib divisor for attribs
+        for (let i = 0; i < 4; ++i) {
+            const loc = this.modelMatrix + i;
+            gl.vertexAttribDivisor(loc, 0);
+        }
+        renderer.checkGlError("VertexLitInstancedShader glDrawElements");
+    }
+    drawInstanced(renderer, model, bufferMatrices, offset, instances) {
+        if (this.rm_Vertex === undefined
+            || this.rm_TexCoord0 === undefined
+            || this.modelMatrix === undefined) {
+            return;
+        }
+        const gl = renderer.gl;
+        model.bindBuffers(gl);
+        gl.enableVertexAttribArray(this.rm_Vertex);
+        gl.enableVertexAttribArray(this.rm_TexCoord0);
+        gl.vertexAttribPointer(this.rm_Vertex, 3, gl.HALF_FLOAT, false, 12, 0);
+        gl.vertexAttribPointer(this.rm_TexCoord0, 2, gl.HALF_FLOAT, false, 12, 6);
+        gl.bindBuffer(gl.ARRAY_BUFFER, bufferMatrices);
+        // set all 4 attributes for matrix
+        const bytesPerMatrix = 4 * 16;
+        for (let i = 0; i < 4; ++i) {
+            const loc = this.modelMatrix + i;
+            gl.enableVertexAttribArray(loc);
+            // note the stride and offset
+            const offset = i * 16; // 4 floats per row, 4 bytes per float
+            gl.vertexAttribPointer(loc, // location
+            4, // size (num values to pull from buffer per iteration)
+            gl.FLOAT, // type of data in buffer
+            false, // normalize
+            bytesPerMatrix, // stride, num bytes to advance to get to next set of values
+            offset);
+            // this line says this attribute only changes for each 1 instance
+            gl.vertexAttribDivisor(loc, 1);
+        }
+        renderer.calculateMVPMatrix(0, 0, 0, 0, 0, 0, 1, 1, 1);
+        gl.uniformMatrix4fv(this.viewMatrix, false, renderer.getViewMatrix());
+        gl.uniformMatrix4fv(this.projMatrix, false, renderer.getProjectionMatrix());
+        gl.drawElementsInstanced(gl.TRIANGLES, model.getNumIndices() * 3, gl.UNSIGNED_SHORT, offset, instances);
+        renderer.checkGlError("InstancedShader glDrawElements");
+    }
+}
+InstancedShader.COMMON_UNIFORMS_ATTRIBUTES = `
+    uniform mat4 viewMatrix;
+    uniform mat4 projMatrix;
+    in mat4 modelMatrix;
+    `;
+InstancedShader.COMMON_TRANSFORMS = `
+    // mat4 view_proj_matrix = modelMatrix * viewMatrix * projMatrix;
+    // mat4 view_proj_matrix = viewMatrix * modelMatrix * projMatrix; // as in calculateMVPMatrix()
+    mat4 view_proj_matrix = projMatrix * viewMatrix * modelMatrix;
+    // gl_Position = ProjectionMatrix * ViewMatrix * ModelMatrix * vec4(position, 1.0);
+    `;
+
+class InstancedColoredShader extends InstancedShader {
+    fillCode() {
+        super.fillCode();
+        this.fragmentShaderCode = `#version 300 es
+            precision mediump float;
+            uniform sampler2D sTexture;
+
+            in mediump vec2 vTexCoord;
+            out vec4 fragColor;
+
+            uniform vec4 color;
+
+            void main(void) {
+                fragColor = texture(sTexture, vTexCoord) * color;
+            }`;
+    }
+    fillUniformsAttributes() {
+        super.fillUniformsAttributes();
+        this.color = this.getUniform("color");
+    }
+}
+
 const FOV_LANDSCAPE = 60.0; // FOV for landscape
 const FOV_PORTRAIT = 70.0; // FOV for portrait
 class Renderer extends BaseRenderer {
@@ -3567,6 +3863,7 @@ class Renderer extends BaseRenderer {
         this.textureRocksPositions4 = null;
         this.textureRocksPositions5 = null;
         this.textureTreesPositions = null;
+        this.bufferTreesMatrices = null;
         this.animationBird = new CombinedAnimation(5);
         this.Z_NEAR = 2.0;
         this.Z_FAR = 1100.0;
@@ -3675,6 +3972,8 @@ class Renderer extends BaseRenderer {
         this.shaderSky = new SkyShader(this.gl);
         this.shaderBirds = new BirdsShader(this.gl);
         this.shaderFogSprite = new FogSpriteShader(this.gl);
+        this.shaderInstanced = new InstancedShader(this.gl);
+        this.shaderInstancedColored = new InstancedColoredShader(this.gl);
     }
     loadFp32Texture(data, gl, width, height, minFilter = gl.LINEAR, magFilter = gl.LINEAR, clamp = false, numberOfComponents = 3) {
         const texture = gl.createTexture();
@@ -3717,53 +4016,60 @@ class Renderer extends BaseRenderer {
         gl.bindTexture(gl.TEXTURE_2D, null);
         return texture;
     }
-    async loadData() {
+    loadData() {
         var _a;
-        const preset = this.PRESETS[this.currentPreset];
-        this.initOffscreen();
-        this.initVignette();
-        await Promise.all([
-            this.fmSky.load("data/models/sky", this.gl),
-            this.fmRock1.load("data/models/rock-8", this.gl),
-            this.fmRock2.load("data/models/rock-11", this.gl),
-            this.fmRock3.load("data/models/rock-6", this.gl),
-            this.fmTree.load("data/models/pinetree", this.gl),
-            this.fmBird.load("data/models/bird-anim-uv", this.gl),
-            this.fmRock1Grass.load("data/models/rock-8-grass", this.gl),
-            this.fmRock2Grass.load("data/models/rock-11-grass", this.gl),
-            this.fmRock3Grass.load("data/models/rock-6-grass", this.gl),
-            this.fmSmoke.load("data/models/cloud", this.gl),
-        ]);
-        const loadPositionsTexture = (texture, count) => this.loadFp32Texture(texture, this.gl, count, 2, this.gl.NEAREST, this.gl.NEAREST, true, 3);
-        this.textureRocksPositions1 = loadPositionsTexture(ROCKS1_TEXTURE, ROCKS1_COUNT);
-        this.textureRocksPositions2 = loadPositionsTexture(ROCKS2_TEXTURE, ROCKS2_COUNT);
-        this.textureRocksPositions3 = loadPositionsTexture(ROCKS3_TEXTURE, ROCKS3_COUNT);
-        this.textureRocksPositions4 = loadPositionsTexture(ROCKS4_TEXTURE, ROCKS4_COUNT);
-        this.textureRocksPositions5 = loadPositionsTexture(ROCKS5_TEXTURE, ROCKS5_COUNT);
-        this.textureTreesPositions = loadPositionsTexture(TREES_TEXTURE, TREES_COUNT);
-        [
-            this.textureRocks,
-            this.textureTrees,
-            this.textureFogCubemap,
-            this.textureBirds,
-            this.textureGrass,
-            this.textureFern,
-            this.textureCloud,
-            this.textureWhite
-        ] = await Promise.all([
-            UncompressedTextureLoader.load("data/textures/rocks.webp", this.gl, undefined, undefined, true),
-            UncompressedTextureLoader.load("data/textures/pine_leaves.webp", this.gl, undefined, undefined, true),
-            UncompressedTextureLoader.loadCubemap(`data/textures/cubemaps/${preset.cubemap}/sky`, this.gl, "webp"),
-            UncompressedTextureLoader.load("data/textures/bird2.webp", this.gl, undefined, undefined, true),
-            UncompressedTextureLoader.load("data/textures/grass.webp", this.gl, undefined, undefined, false),
-            UncompressedTextureLoader.load("data/textures/fern.webp", this.gl, undefined, undefined, false),
-            UncompressedTextureLoader.load("data/textures/smoke.webp", this.gl),
-            UncompressedTextureLoader.load("data/textures/white.webp", this.gl, undefined, undefined, true)
-        ]);
-        this.generateMipmaps(this.textureRocks, this.textureTrees, this.textureGrass, this.textureFern, this.textureCloud, this.textureBirds);
-        this.loaded = true;
-        console.log("Loaded all assets");
-        (_a = this.readyCallback) === null || _a === void 0 ? void 0 : _a.call(this);
+        return __awaiter(this, void 0, void 0, function* () {
+            const preset = this.PRESETS[this.currentPreset];
+            this.initOffscreen();
+            this.initVignette();
+            const gl = this.gl;
+            yield Promise.all([
+                this.fmSky.load("data/models/sky", this.gl),
+                this.fmRock1.load("data/models/rock-8", this.gl),
+                this.fmRock2.load("data/models/rock-11", this.gl),
+                this.fmRock3.load("data/models/rock-6", this.gl),
+                this.fmTree.load("data/models/pinetree", this.gl),
+                this.fmBird.load("data/models/bird-anim-uv", this.gl),
+                this.fmRock1Grass.load("data/models/rock-8-grass", this.gl),
+                this.fmRock2Grass.load("data/models/rock-11-grass", this.gl),
+                this.fmRock3Grass.load("data/models/rock-6-grass", this.gl),
+                this.fmSmoke.load("data/models/cloud", this.gl),
+            ]);
+            const loadPositionsTexture = (texture, count) => this.loadFp32Texture(texture, this.gl, count, 2, this.gl.NEAREST, this.gl.NEAREST, true, 3);
+            this.textureRocksPositions1 = loadPositionsTexture(ROCKS1_TEXTURE, ROCKS1_COUNT);
+            this.textureRocksPositions2 = loadPositionsTexture(ROCKS2_TEXTURE, ROCKS2_COUNT);
+            this.textureRocksPositions3 = loadPositionsTexture(ROCKS3_TEXTURE, ROCKS3_COUNT);
+            this.textureRocksPositions4 = loadPositionsTexture(ROCKS4_TEXTURE, ROCKS4_COUNT);
+            this.textureRocksPositions5 = loadPositionsTexture(ROCKS5_TEXTURE, ROCKS5_COUNT);
+            this.textureTreesPositions = loadPositionsTexture(TREES_TEXTURE, TREES_COUNT);
+            // console.log(TREES_XFORM);
+            this.bufferTreesMatrices = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.bufferTreesMatrices);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(TREES_XFORM), gl.STATIC_DRAW);
+            [
+                this.textureRocks,
+                this.textureTrees,
+                this.textureFogCubemap,
+                this.textureBirds,
+                this.textureGrass,
+                this.textureFern,
+                this.textureCloud,
+                this.textureWhite
+            ] = yield Promise.all([
+                UncompressedTextureLoader.load("data/textures/rocks.webp", this.gl, undefined, undefined, true),
+                UncompressedTextureLoader.load("data/textures/pine_leaves.webp", this.gl, undefined, undefined, true),
+                UncompressedTextureLoader.loadCubemap(`data/textures/cubemaps/${preset.cubemap}/sky`, this.gl, "webp"),
+                UncompressedTextureLoader.load("data/textures/bird2.webp", this.gl, undefined, undefined, true),
+                UncompressedTextureLoader.load("data/textures/grass.webp", this.gl, undefined, undefined, false),
+                UncompressedTextureLoader.load("data/textures/fern.webp", this.gl, undefined, undefined, false),
+                UncompressedTextureLoader.load("data/textures/smoke.webp", this.gl),
+                UncompressedTextureLoader.load("data/textures/white.webp", this.gl, undefined, undefined, true)
+            ]);
+            this.generateMipmaps(this.textureRocks, this.textureTrees, this.textureGrass, this.textureFern, this.textureCloud, this.textureBirds);
+            this.loaded = true;
+            console.log("Loaded all assets");
+            (_a = this.readyCallback) === null || _a === void 0 ? void 0 : _a.call(this);
+        });
     }
     initOffscreen() {
         if (this.canvas === undefined) {
@@ -3808,12 +4114,14 @@ class Renderer extends BaseRenderer {
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.mTriangleVerticesVignette);
         this.gl.bufferData(this.gl.ARRAY_BUFFER, this.mQuadTriangles, this.gl.STATIC_DRAW);
     }
-    async changeScene(preset) {
-        const newPreset = preset !== null && preset !== void 0 ? preset : (this.currentPreset + 1) % 4;
-        const texture = await UncompressedTextureLoader.loadCubemap(`data/textures/cubemaps/${this.PRESETS[newPreset].cubemap}/sky`, this.gl, "webp");
-        this.gl.deleteTexture(this.textureFogCubemap);
-        this.textureFogCubemap = texture;
-        this.currentPreset = newPreset;
+    changeScene(preset) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const newPreset = preset !== null && preset !== void 0 ? preset : (this.currentPreset + 1) % 4;
+            const texture = yield UncompressedTextureLoader.loadCubemap(`data/textures/cubemaps/${this.PRESETS[newPreset].cubemap}/sky`, this.gl, "webp");
+            this.gl.deleteTexture(this.textureFogCubemap);
+            this.textureFogCubemap = texture;
+            this.currentPreset = newPreset;
+        });
     }
     animate() {
         const timeNow = new Date().getTime();
@@ -3966,23 +4274,35 @@ class Renderer extends BaseRenderer {
         if (this.shaderFogVertexLitGrass === undefined
             || this.shaderFogAt === undefined
             || this.shaderFogSprite === undefined
-            || this.shaderDiffuse === undefined) {
+            || this.shaderDiffuse === undefined
+            || this.shaderInstanced === undefined) {
             console.log("undefined shaders");
             return;
         }
         const preset = this.PRESETS[this.currentPreset];
         this.gl.enable(this.gl.CULL_FACE);
         let shader;
-        shader = this.shaderFogAt;
-        shader.use();
-        this.gl.uniform1f(shader.fogStartDistance, this.fogStartDistance);
-        this.gl.uniform1f(shader.fogDistance, this.config.fogDistance);
-        this.gl.uniform2f(shader.heightFogParams, this.config.fogHeightOffset, this.config.fogHeightMultiplier);
-        this.setTexture2D(1, this.noTextures ? this.textureWhite : this.textureTrees, shader.sTexture);
-        this.gl.uniformMatrix4fv(shader.view_matrix, false, this.getViewMatrix());
-        this.setTextureCubemap(2, this.textureFogCubemap, shader.texCubemap);
-        this.gl.uniform2f(shader.heightOffset, 0, -this.config.treesHeightOffset);
-        this.drawInstances(shader, this.fmTree, this.textureTreesPositions, TREES_COUNT, [0.003, 0.003], [0, 0, 0]);
+        // shader = this.shaderFogAt;
+        // shader.use();
+        // this.gl.uniform1f(shader.fogStartDistance!, this.fogStartDistance);
+        // this.gl.uniform1f(shader.fogDistance!, this.config.fogDistance);
+        // this.gl.uniform2f(shader.heightFogParams!, this.config.fogHeightOffset, this.config.fogHeightMultiplier);
+        // this.setTexture2D(1, this.noTextures ? this.textureWhite! : this.textureTrees!, shader.sTexture!);
+        // this.gl.uniformMatrix4fv(shader.view_matrix!, false, this.getViewMatrix());
+        // this.setTextureCubemap(2, this.textureFogCubemap!, shader.texCubemap!);
+        // this.gl.uniform2f(shader.heightOffset!, 0, -this.config.treesHeightOffset);
+        // this.drawInstances(
+        //     shader,
+        //     this.fmTree, this.textureTreesPositions!, TREES_COUNT,
+        //     [0.003, 0.003],
+        //     [0, 0, 0]
+        // );
+        this.shaderInstanced.use();
+        this.setTexture2D(1, this.noTextures ? this.textureWhite : this.textureTrees, this.shaderInstanced.sTexture);
+        // this.shaderInstanced.drawInstanced(this, this.fmTree, this.bufferTreesMatrices!, 0, TREES_COUNT);
+        this.shaderInstanced.drawModel(this, this.fmTree, this.bufferTreesMatrices);
+        this.shaderInstanced.drawInstanced(this, this.fmTree, this.bufferTreesMatrices, 0, TREES_COUNT);
+        // TODO: use this.config.treesHeightOffset when generating tree matrices
         shader = this.shaderFogVertexLitGrass;
         shader.use();
         this.gl.uniform1f(shader.fogStartDistance, this.fogStartDistance);
