@@ -27,6 +27,8 @@ import { FogVertexLitGrassShader } from "./shaders/FogVertexLitGrassShader";
 import { FogSpriteShader } from "./shaders/FogSpriteShader";
 import { InstancedShader } from "./shaders/InstancedShader";
 import { InstancedColoredShader } from "./shaders/InstancedColoredShader";
+import { FogInstancedShader } from "./shaders/FogInstancedShader";
+import { FogInstancedAtShader } from "./shaders/FogInstancedAtShader";
 
 const FOV_LANDSCAPE = 60.0; // FOV for landscape
 const FOV_PORTRAIT = 70.0; // FOV for portrait
@@ -84,6 +86,8 @@ export class Renderer extends BaseRenderer {
 
     private shaderInstanced: InstancedShader | undefined;
     private shaderInstancedColored: InstancedColoredShader | undefined;
+    private shaderInstancedFog: FogInstancedShader | undefined;
+    private shaderInstancedFogAt: FogInstancedAtShader | undefined;
 
     private animationBird = new CombinedAnimation(5);
 
@@ -218,6 +222,8 @@ export class Renderer extends BaseRenderer {
 
         this.shaderInstanced = new InstancedShader(this.gl);
         this.shaderInstancedColored = new InstancedColoredShader(this.gl);
+        this.shaderInstancedFog = new FogInstancedShader(this.gl);
+        this.shaderInstancedFogAt = new FogInstancedAtShader(this.gl);
     }
 
     protected loadFp32Texture(
@@ -606,6 +612,8 @@ export class Renderer extends BaseRenderer {
             || this.shaderFogSprite === undefined
             || this.shaderDiffuse === undefined
             || this.shaderInstanced === undefined
+            || this.shaderInstancedFog === undefined
+            || this.shaderInstancedFogAt === undefined
         ) {
             console.log("undefined shaders");
             return;
@@ -616,6 +624,7 @@ export class Renderer extends BaseRenderer {
         this.gl.enable(this.gl.CULL_FACE);
 
         let shader: FogShader;
+        let shader2: FogInstancedShader;
 
         // shader = this.shaderFogAt;
         // shader.use();
@@ -633,12 +642,27 @@ export class Renderer extends BaseRenderer {
         //     [0, 0, 0]
         // );
 
-        this.shaderInstanced.use();
-        this.setTexture2D(1, this.noTextures ? this.textureWhite! : this.textureTrees!, this.shaderInstanced.sTexture!);
+        // this.shaderInstanced.use();
+        // this.setTexture2D(1, this.noTextures ? this.textureWhite! : this.textureTrees!, this.shaderInstanced.sTexture!);
+        // // this.shaderInstanced.drawModel(this, this.fmTree, this.bufferTreesMatrices!);
         // this.shaderInstanced.drawInstanced(this, this.fmTree, this.bufferTreesMatrices!, 0, TREES_COUNT);
-        this.shaderInstanced.drawModel(this, this.fmTree, this.bufferTreesMatrices!);
-        this.shaderInstanced.drawInstanced(this, this.fmTree, this.bufferTreesMatrices!, 0, TREES_COUNT);
-        // TODO: use this.config.treesHeightOffset when generating tree matrices
+        // // TODO: use this.config.treesHeightOffset when generating tree matrices
+
+        this.gl.disable(this.gl.CULL_FACE);
+
+        shader2 = this.shaderInstancedFogAt;
+        shader2.use();
+        this.gl.uniform1f(shader2.fogStartDistance!, this.fogStartDistance);
+        this.gl.uniform1f(shader2.fogDistance!, this.config.fogDistance);
+        this.gl.uniform2f(shader2.heightFogParams!, this.config.fogHeightOffset, this.config.fogHeightMultiplier);
+        this.setTexture2D(0, this.noTextures ? this.textureWhite! : this.textureTrees!, shader2.sTexture!);
+        this.setTextureCubemap(1, this.textureFogCubemap!, shader2.texCubemap!);
+        this.gl.uniform2f(shader2.heightOffset!, 0, -this.config.treesHeightOffset);
+        this.gl.uniform4fv(shader2.color!, preset.colorAmbient);
+        // this.shaderInstanced.drawModel(this, this.fmTree, this.bufferTreesMatrices!);
+        shader2.drawInstanced(this, this.fmTree, this.bufferTreesMatrices!, 0, TREES_COUNT);
+
+        this.gl.enable(this.gl.CULL_FACE);
 
         shader = this.shaderFogVertexLitGrass;
         shader.use();
@@ -696,7 +720,7 @@ export class Renderer extends BaseRenderer {
         this.gl.uniform2f(shader.heightFogParams!, this.config.fogHeightOffset, this.config.fogHeightMultiplier);
         this.gl.uniformMatrix4fv(shader.view_matrix!, false, this.getViewMatrix());
         this.setTextureCubemap(2, this.textureFogCubemap!, shader.texCubemap!);
-        this.gl.uniform2f(shader.heightOffset!, 0, -this.config.treesHeightOffset);
+        // this.gl.uniform2f(shader.heightOffset!, 0, -this.config.treesHeightOffset);
 
         this.setTexture2D(1, this.noTextures ? this.textureWhite! : this.textureFern!, shader.sTexture!);
         this.gl.uniform2f(shader.heightOffset!, this.config.heightOffset, this.config.heightOffset * 0.25);

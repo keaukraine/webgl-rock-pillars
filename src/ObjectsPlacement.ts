@@ -73,7 +73,7 @@ export function addPositions(
 
 let positions: number[][] = [];
 
-function initPositions(instances: number, minDistance: number, offset: number): [texture: Float32Array, instances: number, matrices: number[]] {
+function initPositions(instances: number, minDistance: number, offset: number, heightOffset = 0): [texture: Float32Array, instances: number, matrices: number[]] {
     positions = [];
     const matrices: number[][] = [];
 
@@ -81,7 +81,8 @@ function initPositions(instances: number, minDistance: number, offset: number): 
 
     const texture = new Float32Array(positions.length * 6);
     for (let i = 0; i < positions.length; i++) {
-        const [x, y, z] = positions[i];
+        let [x, y, z] = positions[i];
+        z = heightOffset;
         const scale = 0.003 + Math.random() * 0.003;
         // const scale = 0.06;
         texture[i * 3 + 0] = x; // translation X
@@ -93,16 +94,10 @@ function initPositions(instances: number, minDistance: number, offset: number): 
         texture[i * 3 + 2 + positions.length * 3] = 0;
 
         calculateModelMatrix(
-            x, y, 0,
+            x, y, z,
             0, 0, a,
             scale, scale, scale
         );
-        // calculateModelMatrix(
-        //     0, 0, 0,
-        //     0, 0, a,
-        //     1, 1, 1
-        // );
-        // mat4.identity(matrixTemp);
         matrices.push([...matrixTemp]);
     }
 
@@ -137,8 +132,9 @@ export const [ROCKS2_TEXTURE, ROCKS2_COUNT] = initPositions(119, 0.72, 25);
 export const [ROCKS3_TEXTURE, ROCKS3_COUNT] = initPositions(60, 0.75, 60); // outer, large, non-floating
 export const [ROCKS4_TEXTURE, ROCKS4_COUNT] = initPositions(40, 0, 10); // central tall floating
 export const [ROCKS5_TEXTURE, ROCKS5_COUNT] = initPositions(70, 0, 30); // central non-floating
-export const [TREES_TEXTURE, TREES_COUNT, TREES_XFORM] = initPositions(1360, 0.0, 60);
 export const [PARTICLES_TEXTURE, PARTICLES_COUNT] = initPositions(40, 0.0, 40);
+
+export const [TREES_TEXTURE, TREES_COUNT, TREES_XFORM] = initPositions(1360, 0.0, 60, 0/*-5.2*/);
 
 const birds1 = new CameraPositionInterpolator();
 birds1.reverse = true;

@@ -43,6 +43,8 @@ export declare class Renderer extends BaseRenderer {
     private shaderFogSprite;
     private shaderInstanced;
     private shaderInstancedColored;
+    private shaderInstancedFog;
+    private shaderInstancedFogAt;
     private animationBird;
     private customCamera;
     private Z_NEAR;

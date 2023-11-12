@@ -2789,13 +2789,14 @@ function addPositions(positions, instances, minDistance, offset) {
     }
 }
 let positions = [];
-function initPositions(instances, minDistance, offset) {
+function initPositions(instances, minDistance, offset, heightOffset = 0) {
     positions = [];
     const matrices = [];
     addPositions(positions, instances, minDistance, offset); // further from spline
     const texture = new Float32Array(positions.length * 6);
     for (let i = 0; i < positions.length; i++) {
-        const [x, y, z] = positions[i];
+        let [x, y, z] = positions[i];
+        z = heightOffset;
         const scale = 0.003 + Math.random() * 0.003;
         // const scale = 0.06;
         texture[i * 3 + 0] = x; // translation X
@@ -2805,13 +2806,7 @@ function initPositions(instances, minDistance, offset) {
         texture[i * 3 + 0 + positions.length * 3] = Math.sin(a); // rotation sin
         texture[i * 3 + 1 + positions.length * 3] = Math.cos(a); // rotation cos
         texture[i * 3 + 2 + positions.length * 3] = 0;
-        calculateModelMatrix(x, y, 0, 0, 0, a, scale, scale, scale);
-        // calculateModelMatrix(
-        //     0, 0, 0,
-        //     0, 0, a,
-        //     1, 1, 1
-        // );
-        // mat4.identity(matrixTemp);
+        calculateModelMatrix(x, y, z, 0, 0, a, scale, scale, scale);
         matrices.push([...matrixTemp]);
     }
     return [
@@ -2825,8 +2820,8 @@ const [ROCKS2_TEXTURE, ROCKS2_COUNT] = initPositions(119, 0.72, 25);
 const [ROCKS3_TEXTURE, ROCKS3_COUNT] = initPositions(60, 0.75, 60); // outer, large, non-floating
 const [ROCKS4_TEXTURE, ROCKS4_COUNT] = initPositions(40, 0, 10); // central tall floating
 const [ROCKS5_TEXTURE, ROCKS5_COUNT] = initPositions(70, 0, 30); // central non-floating
-const [TREES_TEXTURE, TREES_COUNT, TREES_XFORM] = initPositions(1360, 0.0, 60);
 const [PARTICLES_TEXTURE, PARTICLES_COUNT] = initPositions(40, 0.0, 40);
+const [TREES_TEXTURE, TREES_COUNT, TREES_XFORM] = initPositions(1360, 0.0, 60, 0 /*-5.2*/);
 const birds1 = new CameraPositionInterpolator();
 birds1.reverse = true;
 birds1.speed = 1000;
@@ -3143,7 +3138,7 @@ class InstancedTexturePositionsColoredShader extends InstancedTexturePositionsSh
     }
 }
 
-var _a;
+var _a$1;
 class FogShader extends InstancedTexturePositionsColoredShader {
     fillCode() {
         this.vertexShaderCode = `#version 300 es
@@ -3206,7 +3201,7 @@ class FogShader extends InstancedTexturePositionsColoredShader {
         this.texCubemap = this.getUniform("texCubemap");
     }
 }
-_a = FogShader;
+_a$1 = FogShader;
 FogShader.FOG_VERTEX_UNIFORMS_VARYINGS = `
         uniform vec2 heightOffset; // x: random positive/negative offset; y: fixed offset
         uniform float fogDistance;
@@ -3231,7 +3226,7 @@ FogShader.FOG_AMOUNT_VERTEX = `
         vFogAmount = clamp(distanceFog, ZERO, ONE);
     `;
 FogShader.FOG_VERTEX_MAIN = `
-        ${_a.FOG_AMOUNT_VERTEX}
+        ${_a$1.FOG_AMOUNT_VERTEX}
         vFogZ = vertex.z;
         texCoord = inverse(mat3(view_matrix)) * (view_matrix * vertex).xyz;
     `;
@@ -3240,7 +3235,7 @@ FogShader.FOG_AMOUNT_FRAGMENT = `
         float fogAmount = clamp(vFogAmount + heightFog, ZERO, ONE);
     `;
 FogShader.FOG_FRAGMENT_MAIN = `
-        ${_a.FOG_AMOUNT_FRAGMENT}
+        ${_a$1.FOG_AMOUNT_FRAGMENT}
         vec4 fogColor = texture(texCubemap, texCoord);
     `;
 
@@ -3603,6 +3598,7 @@ class FogVertexLitGrassShader extends FogVertexLitShader {
                 vec4 mixed = mix(rock, grass, vGrass);
                 vec4 diffuse = mixed * vDiffuseColor;
                 fragColor = mix(diffuse, fogColor, fogAmount);
+                // fragColor.rgb = texCoord;
             }`;
     }
     fillUniformsAttributes() {
@@ -3709,7 +3705,7 @@ class InstancedShader extends BaseShader {
 
             void main(void) {
                 fragColor = texture(sTexture, vTexCoord);
-                fragColor.r = 1.; // FIXME
+                // fragColor.r = 1.; // FIXME
             }`;
     }
     fillUniformsAttributes() {
@@ -3759,7 +3755,7 @@ class InstancedShader extends BaseShader {
         gl.uniformMatrix4fv(this.viewMatrix, false, renderer.getViewMatrix());
         gl.uniformMatrix4fv(this.projMatrix, false, renderer.getProjectionMatrix());
         gl.drawElements(gl.TRIANGLES, model.getNumIndices() * 3, gl.UNSIGNED_SHORT, 0);
-        // Reset attrib divisor for attribs
+        // Reset attrib divisor for matrix attribs
         for (let i = 0; i < 4; ++i) {
             const loc = this.modelMatrix + i;
             gl.vertexAttribDivisor(loc, 0);
@@ -3799,6 +3795,11 @@ class InstancedShader extends BaseShader {
         gl.uniformMatrix4fv(this.viewMatrix, false, renderer.getViewMatrix());
         gl.uniformMatrix4fv(this.projMatrix, false, renderer.getProjectionMatrix());
         gl.drawElementsInstanced(gl.TRIANGLES, model.getNumIndices() * 3, gl.UNSIGNED_SHORT, offset, instances);
+        // Reset attrib divisor for matrix attribs
+        for (let i = 0; i < 4; ++i) {
+            const loc = this.modelMatrix + i;
+            gl.vertexAttribDivisor(loc, 0);
+        }
         renderer.checkGlError("InstancedShader glDrawElements");
     }
 }
@@ -3833,6 +3834,123 @@ class InstancedColoredShader extends InstancedShader {
     fillUniformsAttributes() {
         super.fillUniformsAttributes();
         this.color = this.getUniform("color");
+    }
+}
+
+var _a;
+class FogInstancedShader extends InstancedColoredShader {
+    fillCode() {
+        this.vertexShaderCode = `#version 300 es
+            precision highp float;
+
+            in vec2 rm_TexCoord0;
+            in vec4 rm_Vertex;
+
+            ${InstancedShader.COMMON_UNIFORMS_ATTRIBUTES}
+            ${FogInstancedShader.FOG_VERTEX_UNIFORMS_VARYINGS}
+
+            void main(void) {
+                ${InstancedShader.COMMON_TRANSFORMS}
+                // vec4 vertex = rm_Vertex;
+                vec4 vertex = modelMatrix * rm_Vertex;
+                // GLSL is column-major: mat[col][row]
+                // modelMatrix[0][1] is sine of model rotation angle
+                vertex.z += modelMatrix[0][1] * heightOffset.x + heightOffset.y;
+
+                // gl_Position = view_proj_matrix * vertex;
+                gl_Position = projMatrix * viewMatrix * vertex;
+                vTexCoord = rm_TexCoord0;
+
+                ${FogInstancedShader.FOG_VERTEX_MAIN}
+            }`;
+        this.fragmentShaderCode = `#version 300 es
+            precision mediump float;
+            uniform sampler2D sTexture;
+            uniform vec4 color;
+
+            in mediump vec2 vTexCoord;
+            out vec4 fragColor;
+
+            ${FogInstancedShader.FOG_FRAGMENT_UNIFORMS_VARYINGS}
+
+            void main(void) {
+                ${FogInstancedShader.FOG_FRAGMENT_MAIN}
+                vec4 diffuse = texture(sTexture, vTexCoord) * color;
+                fragColor = mix(diffuse, fogColor, fogAmount);
+                // fragColor.rgb = texCoord;
+                // fragColor.r = 1.;
+            }`;
+    }
+    fillUniformsAttributes() {
+        super.fillUniformsAttributes();
+        this.fogStartDistance = this.getUniform("fogStartDistance");
+        this.fogDistance = this.getUniform("fogDistance");
+        this.heightFogParams = this.getUniform("heightFogParams");
+        this.heightOffset = this.getUniform("heightOffset");
+        this.texCubemap = this.getUniform("texCubemap");
+    }
+}
+_a = FogInstancedShader;
+FogInstancedShader.FOG_VERTEX_UNIFORMS_VARYINGS = `
+        uniform vec2 heightOffset; // x: random positive/negative offset; y: fixed offset
+        uniform float fogDistance;
+        uniform float fogStartDistance;
+        out float vFogAmount;
+        out float vFogZ;
+        out vec3 texCoord;
+        out mediump vec2 vTexCoord;
+        const float ZERO = 0.0;
+        const float ONE = 1.0;
+    `;
+FogInstancedShader.FOG_FRAGMENT_UNIFORMS_VARYINGS = `
+        in float vFogAmount;
+        in float vFogZ;
+        uniform vec2 heightFogParams;
+        in vec3 texCoord;
+        uniform samplerCube texCubemap;
+        const float ZERO = 0.0;
+        const float ONE = 1.0;
+    `;
+FogInstancedShader.FOG_AMOUNT_VERTEX = `
+        float distanceFog = clamp((length(gl_Position) - fogStartDistance) / fogDistance, ZERO, ONE);
+        vFogAmount = clamp(distanceFog, ZERO, ONE);
+    `;
+FogInstancedShader.FOG_VERTEX_MAIN = `
+        ${_a.FOG_AMOUNT_VERTEX}
+        vFogZ = vertex.z;
+        texCoord = inverse(mat3(viewMatrix)) * (viewMatrix * vertex).xyz;
+    `;
+FogInstancedShader.FOG_AMOUNT_FRAGMENT = `
+        float heightFog = clamp(1.0 - ((vFogZ + heightFogParams.x) * heightFogParams.y), ZERO, ONE);
+        float fogAmount = clamp(vFogAmount + heightFog, ZERO, ONE);
+    `;
+FogInstancedShader.FOG_FRAGMENT_MAIN = `
+        ${_a.FOG_AMOUNT_FRAGMENT}
+        vec4 fogColor = texture(texCubemap, texCoord);
+    `;
+
+class FogInstancedAtShader extends FogInstancedShader {
+    fillCode() {
+        super.fillCode();
+        this.fragmentShaderCode = `#version 300 es
+            precision mediump float;
+            uniform sampler2D sTexture;
+            uniform vec4 color;
+
+            in mediump vec2 vTexCoord;
+            out vec4 fragColor;
+
+            ${FogInstancedShader.FOG_FRAGMENT_UNIFORMS_VARYINGS}
+
+            void main(void) {
+                ${FogInstancedShader.FOG_FRAGMENT_MAIN}
+                vec4 diffuse = texture(sTexture, vTexCoord) * color;
+                if (diffuse.a < 0.5) {
+                    discard;
+                } else {
+                    fragColor = mix(diffuse, fogColor, fogAmount);
+                }
+            }`;
     }
 }
 
@@ -3974,6 +4092,8 @@ class Renderer extends BaseRenderer {
         this.shaderFogSprite = new FogSpriteShader(this.gl);
         this.shaderInstanced = new InstancedShader(this.gl);
         this.shaderInstancedColored = new InstancedColoredShader(this.gl);
+        this.shaderInstancedFog = new FogInstancedShader(this.gl);
+        this.shaderInstancedFogAt = new FogInstancedAtShader(this.gl);
     }
     loadFp32Texture(data, gl, width, height, minFilter = gl.LINEAR, magFilter = gl.LINEAR, clamp = false, numberOfComponents = 3) {
         const texture = gl.createTexture();
@@ -4275,13 +4395,16 @@ class Renderer extends BaseRenderer {
             || this.shaderFogAt === undefined
             || this.shaderFogSprite === undefined
             || this.shaderDiffuse === undefined
-            || this.shaderInstanced === undefined) {
+            || this.shaderInstanced === undefined
+            || this.shaderInstancedFog === undefined
+            || this.shaderInstancedFogAt === undefined) {
             console.log("undefined shaders");
             return;
         }
         const preset = this.PRESETS[this.currentPreset];
         this.gl.enable(this.gl.CULL_FACE);
         let shader;
+        let shader2;
         // shader = this.shaderFogAt;
         // shader.use();
         // this.gl.uniform1f(shader.fogStartDistance!, this.fogStartDistance);
@@ -4297,12 +4420,24 @@ class Renderer extends BaseRenderer {
         //     [0.003, 0.003],
         //     [0, 0, 0]
         // );
-        this.shaderInstanced.use();
-        this.setTexture2D(1, this.noTextures ? this.textureWhite : this.textureTrees, this.shaderInstanced.sTexture);
+        // this.shaderInstanced.use();
+        // this.setTexture2D(1, this.noTextures ? this.textureWhite! : this.textureTrees!, this.shaderInstanced.sTexture!);
+        // // this.shaderInstanced.drawModel(this, this.fmTree, this.bufferTreesMatrices!);
         // this.shaderInstanced.drawInstanced(this, this.fmTree, this.bufferTreesMatrices!, 0, TREES_COUNT);
-        this.shaderInstanced.drawModel(this, this.fmTree, this.bufferTreesMatrices);
-        this.shaderInstanced.drawInstanced(this, this.fmTree, this.bufferTreesMatrices, 0, TREES_COUNT);
-        // TODO: use this.config.treesHeightOffset when generating tree matrices
+        // // TODO: use this.config.treesHeightOffset when generating tree matrices
+        this.gl.disable(this.gl.CULL_FACE);
+        shader2 = this.shaderInstancedFogAt;
+        shader2.use();
+        this.gl.uniform1f(shader2.fogStartDistance, this.fogStartDistance);
+        this.gl.uniform1f(shader2.fogDistance, this.config.fogDistance);
+        this.gl.uniform2f(shader2.heightFogParams, this.config.fogHeightOffset, this.config.fogHeightMultiplier);
+        this.setTexture2D(0, this.noTextures ? this.textureWhite : this.textureTrees, shader2.sTexture);
+        this.setTextureCubemap(1, this.textureFogCubemap, shader2.texCubemap);
+        this.gl.uniform2f(shader2.heightOffset, 0, -this.config.treesHeightOffset);
+        this.gl.uniform4fv(shader2.color, preset.colorAmbient);
+        // this.shaderInstanced.drawModel(this, this.fmTree, this.bufferTreesMatrices!);
+        shader2.drawInstanced(this, this.fmTree, this.bufferTreesMatrices, 0, TREES_COUNT);
+        this.gl.enable(this.gl.CULL_FACE);
         shader = this.shaderFogVertexLitGrass;
         shader.use();
         this.gl.uniform1f(shader.fogStartDistance, this.fogStartDistance);
@@ -4334,7 +4469,7 @@ class Renderer extends BaseRenderer {
         this.gl.uniform2f(shader.heightFogParams, this.config.fogHeightOffset, this.config.fogHeightMultiplier);
         this.gl.uniformMatrix4fv(shader.view_matrix, false, this.getViewMatrix());
         this.setTextureCubemap(2, this.textureFogCubemap, shader.texCubemap);
-        this.gl.uniform2f(shader.heightOffset, 0, -this.config.treesHeightOffset);
+        // this.gl.uniform2f(shader.heightOffset!, 0, -this.config.treesHeightOffset);
         this.setTexture2D(1, this.noTextures ? this.textureWhite : this.textureFern, shader.sTexture);
         this.gl.uniform2f(shader.heightOffset, this.config.heightOffset, this.config.heightOffset * 0.25);
         this.drawInstances(shader, this.fmRock1Grass, this.textureRocksPositions1, ROCKS1_COUNT, [0.0055, 0.004]);

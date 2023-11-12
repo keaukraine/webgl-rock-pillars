@@ -50,7 +50,7 @@ export class InstancedShader extends BaseShader {
 
             void main(void) {
                 fragColor = texture(sTexture, vTexCoord);
-                fragColor.r = 1.; // FIXME
+                // fragColor.r = 1.; // FIXME
             }`;
     }
 
@@ -118,7 +118,7 @@ export class InstancedShader extends BaseShader {
         gl.uniformMatrix4fv(this.projMatrix!, false, renderer.getProjectionMatrix());
         gl.drawElements(gl.TRIANGLES, model.getNumIndices() * 3, gl.UNSIGNED_SHORT, 0);
 
-        // Reset attrib divisor for attribs
+        // Reset attrib divisor for matrix attribs
         for (let i = 0; i < 4; ++i) {
             const loc = this.modelMatrix + i;
             gl.vertexAttribDivisor(loc, 0);
@@ -176,6 +176,12 @@ export class InstancedShader extends BaseShader {
         gl.uniformMatrix4fv(this.viewMatrix!, false, renderer.getViewMatrix());
         gl.uniformMatrix4fv(this.projMatrix!, false, renderer.getProjectionMatrix());
         gl.drawElementsInstanced(gl.TRIANGLES, model.getNumIndices() * 3, gl.UNSIGNED_SHORT, offset, instances);
+
+        // Reset attrib divisor for matrix attribs
+        for (let i = 0; i < 4; ++i) {
+            const loc = this.modelMatrix + i;
+            gl.vertexAttribDivisor(loc, 0);
+        }
 
         renderer.checkGlError("InstancedShader glDrawElements");
     }
