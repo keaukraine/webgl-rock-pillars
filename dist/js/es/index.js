@@ -3680,6 +3680,11 @@ class FogSpriteShader extends DiffuseShader {
 }
 
 class InstancedShader extends BaseShader {
+    constructor(gl) {
+        super(gl);
+        this.extBVBI = this.gl.getExtension("WEBGL_multi_draw_instanced_base_vertex_base_instance");
+        // TODO: https://registry.khronos.org/webgl/extensions/WEBGL_multi_draw_instanced_base_vertex_base_instance/
+    }
     fillCode() {
         this.vertexShaderCode = `#version 300 es
             precision highp float;
@@ -3724,7 +3729,7 @@ class InstancedShader extends BaseShader {
             || this.modelMatrix === undefined) {
             return;
         }
-        const gl = renderer.gl;
+        const gl = this.gl;
         model.bindBuffers(gl);
         gl.enableVertexAttribArray(this.rm_Vertex);
         gl.enableVertexAttribArray(this.rm_TexCoord0);
@@ -3762,7 +3767,7 @@ class InstancedShader extends BaseShader {
         }
         renderer.checkGlError("VertexLitInstancedShader glDrawElements");
     }
-    drawInstanced(renderer, model, bufferMatrices, offset, instances) {
+    drawAllInstances(renderer, model, bufferMatrices, instances) {
         if (this.rm_Vertex === undefined
             || this.rm_TexCoord0 === undefined
             || this.modelMatrix === undefined) {
@@ -3794,7 +3799,54 @@ class InstancedShader extends BaseShader {
         renderer.calculateMVPMatrix(0, 0, 0, 0, 0, 0, 1, 1, 1);
         gl.uniformMatrix4fv(this.viewMatrix, false, renderer.getViewMatrix());
         gl.uniformMatrix4fv(this.projMatrix, false, renderer.getProjectionMatrix());
-        gl.drawElementsInstanced(gl.TRIANGLES, model.getNumIndices() * 3, gl.UNSIGNED_SHORT, offset, instances);
+        gl.drawElementsInstanced(gl.TRIANGLES, model.getNumIndices() * 3, gl.UNSIGNED_SHORT, 0, instances);
+        // Reset attrib divisor for matrix attribs
+        for (let i = 0; i < 4; ++i) {
+            const loc = this.modelMatrix + i;
+            gl.vertexAttribDivisor(loc, 0);
+        }
+        renderer.checkGlError("InstancedShader drawAllInstances");
+    }
+    drawInstanced(renderer, model, bufferMatrices, baseInstance, instances) {
+        if (this.rm_Vertex === undefined
+            || this.rm_TexCoord0 === undefined
+            || this.modelMatrix === undefined
+            || !this.extBVBI) {
+            return;
+        }
+        const gl = renderer.gl;
+        model.bindBuffers(gl);
+        gl.enableVertexAttribArray(this.rm_Vertex);
+        gl.enableVertexAttribArray(this.rm_TexCoord0);
+        gl.vertexAttribPointer(this.rm_Vertex, 3, gl.HALF_FLOAT, false, 12, 0);
+        gl.vertexAttribPointer(this.rm_TexCoord0, 2, gl.HALF_FLOAT, false, 12, 6);
+        gl.bindBuffer(gl.ARRAY_BUFFER, bufferMatrices);
+        // set all 4 attributes for matrix
+        const bytesPerMatrix = 4 * 16;
+        for (let i = 0; i < 4; ++i) {
+            const loc = this.modelMatrix + i;
+            gl.enableVertexAttribArray(loc);
+            // note the stride and offset
+            const offset = i * 16; // 4 floats per row, 4 bytes per float
+            gl.vertexAttribPointer(loc, // location
+            4, // size (num values to pull from buffer per iteration)
+            gl.FLOAT, // type of data in buffer
+            false, // normalize
+            bytesPerMatrix, // stride, num bytes to advance to get to next set of values
+            offset);
+            // this line says this attribute only changes for each 1 instance
+            gl.vertexAttribDivisor(loc, 1);
+        }
+        renderer.calculateMVPMatrix(0, 0, 0, 0, 0, 0, 1, 1, 1);
+        gl.uniformMatrix4fv(this.viewMatrix, false, renderer.getViewMatrix());
+        gl.uniformMatrix4fv(this.projMatrix, false, renderer.getProjectionMatrix());
+        // gl.drawElementsInstanced(gl.TRIANGLES, model.getNumIndices() * 3, gl.UNSIGNED_SHORT, 0, instances);
+        let counts = new Int32Array([model.getNumIndices() * 3]);
+        let offsets = new Int32Array([0]);
+        let instanceCounts = new Int32Array([instances]);
+        let baseVertices = new Int32Array([0]);
+        let baseInstances = new Uint32Array([baseInstance]);
+        this.extBVBI.multiDrawElementsInstancedBaseVertexBaseInstanceWEBGL(gl.TRIANGLES, counts, 0, gl.UNSIGNED_SHORT, offsets, 0, instanceCounts, 0, baseVertices, 0, baseInstances, 0, counts.length);
         // Reset attrib divisor for matrix attribs
         for (let i = 0; i < 4; ++i) {
             const loc = this.modelMatrix + i;
@@ -4436,7 +4488,8 @@ class Renderer extends BaseRenderer {
         this.gl.uniform2f(shader2.heightOffset, 0, -this.config.treesHeightOffset);
         this.gl.uniform4fv(shader2.color, preset.colorAmbient);
         // this.shaderInstanced.drawModel(this, this.fmTree, this.bufferTreesMatrices!);
-        shader2.drawInstanced(this, this.fmTree, this.bufferTreesMatrices, 0, TREES_COUNT);
+        // shader2.drawAllInstances(this, this.fmTree, this.bufferTreesMatrices!, TREES_COUNT);
+        shader2.drawInstanced(this, this.fmTree, this.bufferTreesMatrices, TREES_COUNT / 2, TREES_COUNT / 4);
         this.gl.enable(this.gl.CULL_FACE);
         shader = this.shaderFogVertexLitGrass;
         shader.use();

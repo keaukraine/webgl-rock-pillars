@@ -660,7 +660,8 @@ export class Renderer extends BaseRenderer {
         this.gl.uniform2f(shader2.heightOffset!, 0, -this.config.treesHeightOffset);
         this.gl.uniform4fv(shader2.color!, preset.colorAmbient);
         // this.shaderInstanced.drawModel(this, this.fmTree, this.bufferTreesMatrices!);
-        shader2.drawInstanced(this, this.fmTree, this.bufferTreesMatrices!, 0, TREES_COUNT);
+        // shader2.drawAllInstances(this, this.fmTree, this.bufferTreesMatrices!, TREES_COUNT);
+        shader2.drawInstanced(this, this.fmTree, this.bufferTreesMatrices!, TREES_COUNT / 2, TREES_COUNT / 4);
 
         this.gl.enable(this.gl.CULL_FACE);
 
