@@ -2789,7 +2789,7 @@ function addPositions(positions, instances, minDistance, offset) {
     }
 }
 let positions = [];
-function initPositions(instances, minDistance, offset, heightOffset = 0) {
+function initPositions(instances, minDistance, offset, heightOffset = 0, scales = [1, 1]) {
     positions = [];
     const matrices = [];
     addPositions(positions, instances, minDistance, offset); // further from spline
@@ -2797,8 +2797,8 @@ function initPositions(instances, minDistance, offset, heightOffset = 0) {
     for (let i = 0; i < positions.length; i++) {
         let [x, y, z] = positions[i];
         z = heightOffset;
-        const scale = 0.003 + Math.random() * 0.003;
-        // const scale = 0.06;
+        // const scale = 0.003 + Math.random() * 0.003;
+        const scale = scales[0] + Math.random() * scales[1];
         texture[i * 3 + 0] = x; // translation X
         texture[i * 3 + 1] = y; // translation Y
         texture[i * 3 + 2] = scale; // scale
@@ -2815,13 +2815,14 @@ function initPositions(instances, minDistance, offset, heightOffset = 0) {
         matrices.flat() // FIXME
     ];
 }
-const [ROCKS1_TEXTURE, ROCKS1_COUNT] = initPositions(97, 0.7, 23);
+// export const [ROCKS1_TEXTURE, ROCKS1_COUNT] = initPositions(97, 0.7, 23);
 const [ROCKS2_TEXTURE, ROCKS2_COUNT] = initPositions(119, 0.72, 25);
 const [ROCKS3_TEXTURE, ROCKS3_COUNT] = initPositions(60, 0.75, 60); // outer, large, non-floating
 const [ROCKS4_TEXTURE, ROCKS4_COUNT] = initPositions(40, 0, 10); // central tall floating
 const [ROCKS5_TEXTURE, ROCKS5_COUNT] = initPositions(70, 0, 30); // central non-floating
 const [PARTICLES_TEXTURE, PARTICLES_COUNT] = initPositions(40, 0.0, 40);
-const [TREES_TEXTURE, TREES_COUNT, TREES_XFORM] = initPositions(1360, 0.0, 60, 0 /*-5.2*/);
+const [ROCKS1_TEXTURE, ROCKS1_COUNT, ROCKS1_XFORM] = initPositions(97, 0.7, 23, 0, [0.0055, 0.004]);
+const [TREES_TEXTURE, TREES_COUNT, TREES_XFORM] = initPositions(1360, 0.0, 60, 0, [0.003, 0.003]);
 const birds1 = new CameraPositionInterpolator();
 birds1.reverse = true;
 birds1.speed = 1000;
@@ -3902,8 +3903,6 @@ class FogInstancedShader extends InstancedColoredShader {
             ${FogInstancedShader.FOG_VERTEX_UNIFORMS_VARYINGS}
 
             void main(void) {
-                ${InstancedShader.COMMON_TRANSFORMS}
-                // vec4 vertex = rm_Vertex;
                 vec4 vertex = modelMatrix * rm_Vertex;
                 // GLSL is column-major: mat[col][row]
                 // modelMatrix[0][1] is sine of model rotation angle
@@ -4006,6 +4005,128 @@ class FogInstancedAtShader extends FogInstancedShader {
     }
 }
 
+class FogInstancedVertexLitGrassShader extends FogInstancedShader {
+    fillCode() {
+        this.vertexShaderCode = `#version 300 es
+            precision highp float;
+
+            in vec2 rm_TexCoord0;
+            in vec4 rm_Vertex;
+            in vec3 rm_Normal;
+
+            ${InstancedShader.COMMON_UNIFORMS_ATTRIBUTES}
+            ${FogInstancedShader.FOG_VERTEX_UNIFORMS_VARYINGS}
+
+            uniform vec4 color;
+            uniform vec4 colorSun;
+            uniform vec4 lightDir;
+            uniform float diffuseExponent;
+            out vec4 vDiffuseColor;
+            out float vGrass;
+            uniform float grassAmount;
+
+            void main(void) {
+                vec4 vertex = modelMatrix * rm_Vertex;
+                // GLSL is column-major: mat[col][row]
+                // modelMatrix[0][1] is sine of model rotation angle
+                vertex.z += modelMatrix[0][1] * heightOffset.x + heightOffset.y;
+
+                gl_Position = projMatrix * viewMatrix * vertex;
+                vTexCoord = rm_TexCoord0;
+
+                ${FogInstancedShader.FOG_VERTEX_MAIN}
+
+                vec4 normal = normalize(modelMatrix * vec4(rm_Normal, 0.0));
+
+                float d = pow(max(0.0, dot(normal, lightDir)), diffuseExponent);
+
+                vDiffuseColor = mix(colorSun, color, d);
+                vGrass = smoothstep(0.2, 0.3, normal.z * grassAmount);
+            }`;
+        this.fragmentShaderCode = `#version 300 es
+            precision mediump float;
+            uniform sampler2D sTexture;
+            uniform vec4 color;
+
+            in mediump vec2 vTexCoord;
+            out vec4 fragColor;
+
+            uniform sampler2D sTextureGrass;
+            in vec4 vDiffuseColor;
+            in float vGrass;
+
+            ${FogInstancedShader.FOG_FRAGMENT_UNIFORMS_VARYINGS}
+
+            void main(void) {
+                ${FogInstancedShader.FOG_FRAGMENT_MAIN}
+                vec4 rock = texture(sTexture, vTexCoord);
+                vec4 grass = texture(sTextureGrass, vTexCoord * 5.0);
+                vec4 mixed = mix(rock, grass, vGrass);
+                vec4 diffuse = mixed * vDiffuseColor;
+                fragColor = mix(diffuse, fogColor, fogAmount);
+            }`;
+    }
+    fillUniformsAttributes() {
+        super.fillUniformsAttributes();
+        this.colorSun = this.getUniform("colorSun");
+        this.lightDir = this.getUniform("lightDir");
+        this.diffuseExponent = this.getUniform("diffuseExponent");
+        this.rm_Normal = this.getAttrib("rm_Normal");
+        this.sTextureGrass = this.getUniform("sTextureGrass");
+        this.grassAmount = this.getUniform("grassAmount");
+    }
+    drawInstanced(renderer, model, bufferMatrices, baseInstance, instances) {
+        if (this.rm_Vertex === undefined
+            || this.rm_TexCoord0 === undefined
+            || this.rm_Normal === undefined
+            || this.modelMatrix === undefined
+            || !this.extBVBI) {
+            return;
+        }
+        const gl = renderer.gl;
+        model.bindBuffers(gl);
+        gl.enableVertexAttribArray(this.rm_Vertex);
+        gl.enableVertexAttribArray(this.rm_TexCoord0);
+        gl.enableVertexAttribArray(this.rm_Normal);
+        gl.vertexAttribPointer(this.rm_Vertex, 3, gl.HALF_FLOAT, false, 16, 0);
+        gl.vertexAttribPointer(this.rm_TexCoord0, 2, gl.HALF_FLOAT, false, 16, 6);
+        gl.vertexAttribPointer(this.rm_Normal, 3, gl.HALF_FLOAT, false, 16, 10);
+        gl.bindBuffer(gl.ARRAY_BUFFER, bufferMatrices);
+        // set all 4 attributes for matrix
+        const bytesPerMatrix = 4 * 16;
+        for (let i = 0; i < 4; ++i) {
+            const loc = this.modelMatrix + i;
+            gl.enableVertexAttribArray(loc);
+            // note the stride and offset
+            const offset = i * 16; // 4 floats per row, 4 bytes per float
+            gl.vertexAttribPointer(loc, // location
+            4, // size (num values to pull from buffer per iteration)
+            gl.FLOAT, // type of data in buffer
+            false, // normalize
+            bytesPerMatrix, // stride, num bytes to advance to get to next set of values
+            offset);
+            // this line says this attribute only changes for each 1 instance
+            gl.vertexAttribDivisor(loc, 1);
+        }
+        renderer.calculateMVPMatrix(0, 0, 0, 0, 0, 0, 1, 1, 1);
+        gl.uniformMatrix4fv(this.viewMatrix, false, renderer.getViewMatrix());
+        gl.uniformMatrix4fv(this.projMatrix, false, renderer.getProjectionMatrix());
+        // gl.drawElementsInstanced(gl.TRIANGLES, model.getNumIndices() * 3, gl.UNSIGNED_SHORT, 0, instances);
+        let counts = new Int32Array([model.getNumIndices() * 3]);
+        let offsets = new Int32Array([0]);
+        let instanceCounts = new Int32Array([instances]);
+        let baseVertices = new Int32Array([0]);
+        let baseInstances = new Uint32Array([baseInstance]);
+        this.extBVBI.multiDrawElementsInstancedBaseVertexBaseInstanceWEBGL(gl.TRIANGLES, counts, 0, gl.UNSIGNED_SHORT, offsets, 0, instanceCounts, 0, baseVertices, 0, baseInstances, 0, counts.length);
+        // Reset attrib divisor for matrix attribs
+        for (let i = 0; i < 4; ++i) {
+            const loc = this.modelMatrix + i;
+            gl.vertexAttribDivisor(loc, 0);
+        }
+        renderer.checkGlError("InstancedShader glDrawElements");
+    }
+}
+
 const FOV_LANDSCAPE = 60.0; // FOV for landscape
 const FOV_PORTRAIT = 70.0; // FOV for portrait
 class Renderer extends BaseRenderer {
@@ -4034,6 +4155,7 @@ class Renderer extends BaseRenderer {
         this.textureRocksPositions5 = null;
         this.textureTreesPositions = null;
         this.bufferTreesMatrices = null;
+        this.bufferRocks1Matrices = null;
         this.animationBird = new CombinedAnimation(5);
         this.Z_NEAR = 2.0;
         this.Z_FAR = 1100.0;
@@ -4146,6 +4268,7 @@ class Renderer extends BaseRenderer {
         this.shaderInstancedColored = new InstancedColoredShader(this.gl);
         this.shaderInstancedFog = new FogInstancedShader(this.gl);
         this.shaderInstancedFogAt = new FogInstancedAtShader(this.gl);
+        this.shaderInstancedRocks = new FogInstancedVertexLitGrassShader(this.gl);
     }
     loadFp32Texture(data, gl, width, height, minFilter = gl.LINEAR, magFilter = gl.LINEAR, clamp = false, numberOfComponents = 3) {
         const texture = gl.createTexture();
@@ -4214,10 +4337,12 @@ class Renderer extends BaseRenderer {
             this.textureRocksPositions4 = loadPositionsTexture(ROCKS4_TEXTURE, ROCKS4_COUNT);
             this.textureRocksPositions5 = loadPositionsTexture(ROCKS5_TEXTURE, ROCKS5_COUNT);
             this.textureTreesPositions = loadPositionsTexture(TREES_TEXTURE, TREES_COUNT);
-            // console.log(TREES_XFORM);
             this.bufferTreesMatrices = gl.createBuffer();
             gl.bindBuffer(gl.ARRAY_BUFFER, this.bufferTreesMatrices);
             gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(TREES_XFORM), gl.STATIC_DRAW);
+            this.bufferRocks1Matrices = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.bufferRocks1Matrices);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(ROCKS1_XFORM), gl.STATIC_DRAW);
             [
                 this.textureRocks,
                 this.textureTrees,
@@ -4455,8 +4580,6 @@ class Renderer extends BaseRenderer {
         }
         const preset = this.PRESETS[this.currentPreset];
         this.gl.enable(this.gl.CULL_FACE);
-        let shader;
-        let shader2;
         // shader = this.shaderFogAt;
         // shader.use();
         // this.gl.uniform1f(shader.fogStartDistance!, this.fogStartDistance);
@@ -4472,67 +4595,116 @@ class Renderer extends BaseRenderer {
         //     [0.003, 0.003],
         //     [0, 0, 0]
         // );
-        // this.shaderInstanced.use();
-        // this.setTexture2D(1, this.noTextures ? this.textureWhite! : this.textureTrees!, this.shaderInstanced.sTexture!);
-        // // this.shaderInstanced.drawModel(this, this.fmTree, this.bufferTreesMatrices!);
-        // this.shaderInstanced.drawInstanced(this, this.fmTree, this.bufferTreesMatrices!, 0, TREES_COUNT);
-        // // TODO: use this.config.treesHeightOffset when generating tree matrices
         this.gl.disable(this.gl.CULL_FACE);
-        shader2 = this.shaderInstancedFogAt;
+        // shader2 = this.shaderInstancedFogAt;
+        this.shaderInstancedFogAt.use();
+        this.gl.uniform1f(this.shaderInstancedFogAt.fogStartDistance, this.fogStartDistance);
+        this.gl.uniform1f(this.shaderInstancedFogAt.fogDistance, this.config.fogDistance);
+        this.gl.uniform2f(this.shaderInstancedFogAt.heightFogParams, this.config.fogHeightOffset, this.config.fogHeightMultiplier);
+        this.setTexture2D(0, this.noTextures ? this.textureWhite : this.textureTrees, this.shaderInstancedFogAt.sTexture);
+        this.setTextureCubemap(1, this.textureFogCubemap, this.shaderInstancedFogAt.texCubemap);
+        this.gl.uniform2f(this.shaderInstancedFogAt.heightOffset, 0, -this.config.treesHeightOffset);
+        this.gl.uniform4fv(this.shaderInstancedFogAt.color, preset.colorAmbient);
+        // this.shaderInstancedFogAt.drawAllInstances(this, this.fmTree, this.bufferTreesMatrices!, TREES_COUNT);
+        // this.shaderInstancedFogAt.drawInstanced(this, this.fmTree, this.bufferTreesMatrices!, TREES_COUNT / 2, TREES_COUNT / 4);
+        this.drawInstances2(this.shaderInstancedFogAt, this.fmTree, this.bufferTreesMatrices, TREES_COUNT);
+        this.gl.enable(this.gl.CULL_FACE);
+        const shader2 = this.shaderInstancedRocks;
         shader2.use();
         this.gl.uniform1f(shader2.fogStartDistance, this.fogStartDistance);
         this.gl.uniform1f(shader2.fogDistance, this.config.fogDistance);
         this.gl.uniform2f(shader2.heightFogParams, this.config.fogHeightOffset, this.config.fogHeightMultiplier);
-        this.setTexture2D(0, this.noTextures ? this.textureWhite : this.textureTrees, shader2.sTexture);
+        this.setTexture2D(0, this.noTextures ? this.textureWhite : this.textureRocks, shader2.sTexture);
         this.setTextureCubemap(1, this.textureFogCubemap, shader2.texCubemap);
-        this.gl.uniform2f(shader2.heightOffset, 0, -this.config.treesHeightOffset);
+        this.gl.uniform4fv(shader2.colorSun, preset.colorSun);
         this.gl.uniform4fv(shader2.color, preset.colorAmbient);
-        // this.shaderInstanced.drawModel(this, this.fmTree, this.bufferTreesMatrices!);
-        // shader2.drawAllInstances(this, this.fmTree, this.bufferTreesMatrices!, TREES_COUNT);
-        shader2.drawInstanced(this, this.fmTree, this.bufferTreesMatrices, TREES_COUNT / 2, TREES_COUNT / 4);
-        this.gl.enable(this.gl.CULL_FACE);
-        shader = this.shaderFogVertexLitGrass;
-        shader.use();
-        this.gl.uniform1f(shader.fogStartDistance, this.fogStartDistance);
-        this.gl.uniform1f(shader.fogDistance, this.config.fogDistance);
-        this.gl.uniform2f(shader.heightFogParams, this.config.fogHeightOffset, this.config.fogHeightMultiplier);
-        this.setTexture2D(1, this.noTextures ? this.textureWhite : this.textureRocks, shader.sTexture);
-        this.gl.uniformMatrix4fv(shader.view_matrix, false, this.getViewMatrix());
-        this.setTextureCubemap(2, this.textureFogCubemap, shader.texCubemap);
-        this.gl.uniform4fv(this.shaderFogVertexLitGrass.colorSun, preset.colorSun);
-        this.gl.uniform4fv(this.shaderFogVertexLitGrass.lightDir, preset.lightDir);
-        this.gl.uniform1f(this.shaderFogVertexLitGrass.diffuseExponent, this.config.diffuseExponent);
-        this.gl.uniform1f(this.shaderFogVertexLitGrass.grassAmount, this.config.grassAmount);
-        this.setTexture2D(3, this.noTextures ? this.textureWhite : this.textureGrass, this.shaderFogVertexLitGrass.sTextureGrass);
-        this.gl.uniform2f(shader.heightOffset, this.config.heightOffset, this.config.heightOffset * 0.25);
-        this.drawInstances(shader, this.fmRock1, this.textureRocksPositions1, ROCKS1_COUNT, [0.0055, 0.004]);
-        this.drawInstances(shader, this.fmRock2, this.textureRocksPositions2, ROCKS2_COUNT, [0.006, 0.004]);
-        this.gl.uniform2f(shader.heightOffset, 0, 0);
-        this.drawInstances(shader, this.fmRock3, this.textureRocksPositions3, ROCKS3_COUNT, [0.012, 0.004]);
-        const floatingHeightOffset = 6 * Math.sin(this.timerRocksMovement * Math.PI * 2);
-        this.gl.uniform2f(shader.heightOffset, floatingHeightOffset, 34);
-        this.drawInstances(shader, this.fmRock1, this.textureRocksPositions4, ROCKS4_COUNT, [0.0055, 0.004]);
-        this.gl.uniform2f(shader.heightOffset, 0, -14);
-        this.drawInstances(shader, this.fmRock1, this.textureRocksPositions5, ROCKS5_COUNT, [0.0055, 0.004]);
-        this.gl.disable(this.gl.CULL_FACE);
-        shader = this.shaderFogAt;
-        shader.use();
-        this.gl.uniform1f(shader.fogStartDistance, this.fogStartDistance);
-        this.gl.uniform1f(shader.fogDistance, this.config.fogDistance);
-        this.gl.uniform2f(shader.heightFogParams, this.config.fogHeightOffset, this.config.fogHeightMultiplier);
-        this.gl.uniformMatrix4fv(shader.view_matrix, false, this.getViewMatrix());
-        this.setTextureCubemap(2, this.textureFogCubemap, shader.texCubemap);
-        // this.gl.uniform2f(shader.heightOffset!, 0, -this.config.treesHeightOffset);
-        this.setTexture2D(1, this.noTextures ? this.textureWhite : this.textureFern, shader.sTexture);
-        this.gl.uniform2f(shader.heightOffset, this.config.heightOffset, this.config.heightOffset * 0.25);
-        this.drawInstances(shader, this.fmRock1Grass, this.textureRocksPositions1, ROCKS1_COUNT, [0.0055, 0.004]);
-        this.drawInstances(shader, this.fmRock2Grass, this.textureRocksPositions2, ROCKS2_COUNT, [0.006, 0.004]);
-        this.gl.uniform2f(shader.heightOffset, 0, 0);
-        this.drawInstances(shader, this.fmRock3Grass, this.textureRocksPositions3, ROCKS3_COUNT, [0.012, 0.004]);
-        this.gl.uniform2f(shader.heightOffset, floatingHeightOffset, 34);
-        this.drawInstances(shader, this.fmRock1Grass, this.textureRocksPositions4, ROCKS4_COUNT, [0.0055, 0.004]);
-        this.gl.uniform2f(shader.heightOffset, 0, -14);
-        this.drawInstances(shader, this.fmRock1Grass, this.textureRocksPositions5, ROCKS5_COUNT, [0.0055, 0.004]);
+        this.gl.uniform4fv(shader2.lightDir, preset.lightDir);
+        this.gl.uniform1f(shader2.diffuseExponent, this.config.diffuseExponent);
+        this.gl.uniform1f(shader2.grassAmount, this.config.grassAmount);
+        this.setTexture2D(2, this.noTextures ? this.textureWhite : this.textureGrass, shader2.sTextureGrass);
+        this.drawInstances2(shader2, this.fmRock1, this.bufferRocks1Matrices, ROCKS1_COUNT);
+        // shader = this.shaderFogVertexLitGrass;
+        // shader.use();
+        // this.gl.uniform1f(shader.fogStartDistance!, this.fogStartDistance);
+        // this.gl.uniform1f(shader.fogDistance!, this.config.fogDistance);
+        // this.gl.uniform2f(shader.heightFogParams!, this.config.fogHeightOffset, this.config.fogHeightMultiplier);
+        // this.setTexture2D(1, this.noTextures ? this.textureWhite! : this.textureRocks!, shader.sTexture!);
+        // this.gl.uniformMatrix4fv(shader.view_matrix!, false, this.getViewMatrix());
+        // this.setTextureCubemap(2, this.textureFogCubemap!, shader.texCubemap!);
+        // this.gl.uniform4fv(this.shaderFogVertexLitGrass.colorSun!, preset.colorSun);
+        // this.gl.uniform4fv(this.shaderFogVertexLitGrass.lightDir!, preset.lightDir);
+        // this.gl.uniform1f(this.shaderFogVertexLitGrass.diffuseExponent!, this.config.diffuseExponent);
+        // this.gl.uniform1f(this.shaderFogVertexLitGrass.grassAmount!, this.config.grassAmount);
+        // this.setTexture2D(3, this.noTextures ? this.textureWhite! : this.textureGrass!, this.shaderFogVertexLitGrass.sTextureGrass!);
+        // this.gl.uniform2f(shader.heightOffset!, this.config.heightOffset, this.config.heightOffset * 0.25);
+        // this.drawInstances(
+        //     shader,
+        //     this.fmRock1, this.textureRocksPositions1!, ROCKS1_COUNT,
+        //     [0.0055, 0.004]
+        // );
+        // this.drawInstances(
+        //     shader,
+        //     this.fmRock2, this.textureRocksPositions2!, ROCKS2_COUNT,
+        //     [0.006, 0.004]
+        // );
+        // this.gl.uniform2f(shader.heightOffset!, 0, 0);
+        // this.drawInstances(
+        //     shader,
+        //     this.fmRock3, this.textureRocksPositions3!, ROCKS3_COUNT,
+        //     [0.012, 0.004]
+        // );
+        // const floatingHeightOffset = 6 * Math.sin(this.timerRocksMovement * Math.PI * 2);
+        // this.gl.uniform2f(shader.heightOffset!, floatingHeightOffset, 34);
+        // this.drawInstances(
+        //     shader,
+        //     this.fmRock1, this.textureRocksPositions4!, ROCKS4_COUNT,
+        //     [0.0055, 0.004]
+        // );
+        // this.gl.uniform2f(shader.heightOffset!, 0, -14);
+        // this.drawInstances(
+        //     shader,
+        //     this.fmRock1, this.textureRocksPositions5!, ROCKS5_COUNT,
+        //     [0.0055, 0.004]
+        // );
+        // this.gl.disable(this.gl.CULL_FACE);
+        // shader = this.shaderFogAt;
+        // shader.use();
+        // this.gl.uniform1f(shader.fogStartDistance!, this.fogStartDistance);
+        // this.gl.uniform1f(shader.fogDistance!, this.config.fogDistance);
+        // this.gl.uniform2f(shader.heightFogParams!, this.config.fogHeightOffset, this.config.fogHeightMultiplier);
+        // this.gl.uniformMatrix4fv(shader.view_matrix!, false, this.getViewMatrix());
+        // this.setTextureCubemap(2, this.textureFogCubemap!, shader.texCubemap!);
+        // // this.gl.uniform2f(shader.heightOffset!, 0, -this.config.treesHeightOffset);
+        // this.setTexture2D(1, this.noTextures ? this.textureWhite! : this.textureFern!, shader.sTexture!);
+        // this.gl.uniform2f(shader.heightOffset!, this.config.heightOffset, this.config.heightOffset * 0.25);
+        // this.drawInstances(
+        //     shader,
+        //     this.fmRock1Grass, this.textureRocksPositions1!, ROCKS1_COUNT,
+        //     [0.0055, 0.004]
+        // );
+        // this.drawInstances(
+        //     shader,
+        //     this.fmRock2Grass, this.textureRocksPositions2!, ROCKS2_COUNT,
+        //     [0.006, 0.004]
+        // );
+        // this.gl.uniform2f(shader.heightOffset!, 0, 0);
+        // this.drawInstances(
+        //     shader,
+        //     this.fmRock3Grass, this.textureRocksPositions3!, ROCKS3_COUNT,
+        //     [0.012, 0.004]
+        // );
+        // this.gl.uniform2f(shader.heightOffset!, floatingHeightOffset, 34);
+        // this.drawInstances(
+        //     shader,
+        //     this.fmRock1Grass, this.textureRocksPositions4!, ROCKS4_COUNT,
+        //     [0.0055, 0.004]
+        // );
+        // this.gl.uniform2f(shader.heightOffset!, 0, -14);
+        // this.drawInstances(
+        //     shader,
+        //     this.fmRock1Grass, this.textureRocksPositions5!, ROCKS5_COUNT,
+        //     [0.0055, 0.004]
+        // );
     }
     drawInstances(shader, model, texturePositions, instancesCount, scale, translation = [0, 0, 0]) {
         const preset = this.PRESETS[this.currentPreset];
@@ -4552,6 +4724,25 @@ class Renderer extends BaseRenderer {
             else {
                 shader.drawInstanced(this, model, translation[0], translation[1], translation[2], 0, 0, 0, 1, 1, 1, start, instancesCount - start);
                 shader.drawInstanced(this, model, translation[0], translation[1], translation[2], 0, 0, 0, 1, 1, 1, 0, count - (instancesCount - start));
+            }
+        }
+    }
+    drawInstances2(shader, model, matrices, instancesCount) {
+        this.PRESETS[this.currentPreset];
+        // this.gl.uniform4fv(shader.color!, preset.colorAmbient);
+        const start = Math.floor(instancesCount * (this.timerCamera - 0.05));
+        const count = Math.floor(instancesCount * 0.25);
+        if (start > 0 && start + count <= instancesCount) {
+            shader.drawInstanced(this, model, matrices, start, count);
+        }
+        else {
+            if (start <= 0) {
+                shader.drawInstanced(this, model, matrices, instancesCount + start, -start);
+                shader.drawInstanced(this, model, matrices, 0, count + start);
+            }
+            else {
+                shader.drawInstanced(this, model, matrices, start, instancesCount - start);
+                shader.drawInstanced(this, model, matrices, 0, count - (instancesCount - start));
             }
         }
     }

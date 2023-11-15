@@ -1,7 +1,17 @@
 import { BaseShader, FullModel } from "webgl-framework";
 import { RendererWithExposedMethods } from "webgl-framework/dist/types/RendererWithExposedMethods";
 
-export class InstancedShader extends BaseShader {
+export interface IInstancedShader {
+    drawInstanced(
+        renderer: RendererWithExposedMethods,
+        model: FullModel,
+        bufferMatrices: WebGLBuffer,
+        baseInstance: number,
+        instances: number
+    ): void;
+}
+
+export class InstancedShader extends BaseShader implements IInstancedShader {
     // Uniforms are of type `WebGLUniformLocation`
     viewMatrix: WebGLUniformLocation | undefined;
     projMatrix: WebGLUniformLocation | undefined;

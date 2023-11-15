@@ -1,5 +1,3 @@
-import { BaseShader, FullModel } from "webgl-framework";
-import { RendererWithExposedMethods } from "webgl-framework/dist/types/RendererWithExposedMethods";
 import { InstancedShader } from "./InstancedShader";
 
 export class InstancedColoredShader extends InstancedShader {
