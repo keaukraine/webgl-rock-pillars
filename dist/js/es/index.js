@@ -3688,8 +3688,7 @@ class FogSpriteShader extends DiffuseShader {
 class InstancedShader extends BaseShader {
     constructor(gl) {
         super(gl);
-        this.extBVBI = this.gl.getExtension("WEBGL_multi_draw_instanced_base_vertex_base_instance");
-        // TODO: https://registry.khronos.org/webgl/extensions/WEBGL_multi_draw_instanced_base_vertex_base_instance/
+        this.extBvbi = this.gl.getExtension("WEBGL_draw_instanced_base_vertex_base_instance");
     }
     fillCode() {
         this.vertexShaderCode = `#version 300 es
@@ -3817,7 +3816,7 @@ class InstancedShader extends BaseShader {
         if (this.rm_Vertex === undefined
             || this.rm_TexCoord0 === undefined
             || this.modelMatrix === undefined
-            || !this.extBVBI) {
+            || !this.extBvbi) {
             return;
         }
         const gl = renderer.gl;
@@ -3846,13 +3845,11 @@ class InstancedShader extends BaseShader {
         renderer.calculateMVPMatrix(0, 0, 0, 0, 0, 0, 1, 1, 1);
         gl.uniformMatrix4fv(this.viewMatrix, false, renderer.getViewMatrix());
         gl.uniformMatrix4fv(this.projMatrix, false, renderer.getProjectionMatrix());
-        // gl.drawElementsInstanced(gl.TRIANGLES, model.getNumIndices() * 3, gl.UNSIGNED_SHORT, 0, instances);
-        let counts = new Int32Array([model.getNumIndices() * 3]);
-        let offsets = new Int32Array([0]);
-        let instanceCounts = new Int32Array([instances]);
-        let baseVertices = new Int32Array([0]);
-        let baseInstances = new Uint32Array([baseInstance]);
-        this.extBVBI.multiDrawElementsInstancedBaseVertexBaseInstanceWEBGL(gl.TRIANGLES, counts, 0, gl.UNSIGNED_SHORT, offsets, 0, instanceCounts, 0, baseVertices, 0, baseInstances, 0, counts.length);
+        const count = model.getNumIndices() * 3;
+        const offset = 0;
+        const instanceCount = instances;
+        const baseVertex = 0;
+        this.extBvbi.drawElementsInstancedBaseVertexBaseInstanceWEBGL(gl.TRIANGLES, count, gl.UNSIGNED_SHORT, offset, instanceCount, baseVertex, baseInstance);
         // Reset attrib divisor for matrix attribs
         for (let i = 0; i < 4; ++i) {
             const loc = this.modelMatrix + i;
@@ -4085,7 +4082,7 @@ class FogInstancedVertexLitGrassShader extends FogInstancedShader {
             || this.rm_TexCoord0 === undefined
             || this.rm_Normal === undefined
             || this.modelMatrix === undefined
-            || !this.extBVBI) {
+            || !this.extBvbi) {
             return;
         }
         const gl = renderer.gl;
@@ -4116,13 +4113,11 @@ class FogInstancedVertexLitGrassShader extends FogInstancedShader {
         renderer.calculateMVPMatrix(0, 0, 0, 0, 0, 0, 1, 1, 1);
         gl.uniformMatrix4fv(this.viewMatrix, false, renderer.getViewMatrix());
         gl.uniformMatrix4fv(this.projMatrix, false, renderer.getProjectionMatrix());
-        // gl.drawElementsInstanced(gl.TRIANGLES, model.getNumIndices() * 3, gl.UNSIGNED_SHORT, 0, instances);
-        let counts = new Int32Array([model.getNumIndices() * 3]);
-        let offsets = new Int32Array([0]);
-        let instanceCounts = new Int32Array([instances]);
-        let baseVertices = new Int32Array([0]);
-        let baseInstances = new Uint32Array([baseInstance]);
-        this.extBVBI.multiDrawElementsInstancedBaseVertexBaseInstanceWEBGL(gl.TRIANGLES, counts, 0, gl.UNSIGNED_SHORT, offsets, 0, instanceCounts, 0, baseVertices, 0, baseInstances, 0, counts.length);
+        const count = model.getNumIndices() * 3;
+        const offset = 0;
+        const instanceCount = instances;
+        const baseVertex = 0;
+        this.extBvbi.drawElementsInstancedBaseVertexBaseInstanceWEBGL(gl.TRIANGLES, count, gl.UNSIGNED_SHORT, offset, instanceCount, baseVertex, baseInstance);
         // Reset attrib divisor for matrix attribs
         for (let i = 0; i < 4; ++i) {
             const loc = this.modelMatrix + i;
