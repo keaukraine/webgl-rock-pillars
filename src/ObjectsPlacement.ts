@@ -73,7 +73,13 @@ export function addPositions(
 
 let positions: number[][] = [];
 
-function initPositions(instances: number, minDistance: number, offset: number, heightOffset = 0, scales:[number, number] = [1,1]): [texture: Float32Array, instances: number, matrices: number[]] {
+function initPositions(
+    instances: number,
+    minDistance: number,
+    offset: number,
+    heightOffset = 0,
+    scales: [number, number] = [0, 1]
+): [texture: Float32Array, instances: number, matrices: number[]] {
     positions = [];
     const matrices: number[][] = [];
 
@@ -127,15 +133,21 @@ export function positionOnBirdsSpline(i: number): [number, number, number] {
     return transientBirdsPosition;
 };
 
-// export const [ROCKS1_TEXTURE, ROCKS1_COUNT] = initPositions(97, 0.7, 23);
+export const [PARTICLES_TEXTURE, PARTICLES_COUNT] = initPositions(40, 0.0, 40);
+
+export const [, , ROCKS1_XFORM] = initPositions(97, 0.7, 23, 0, [0.0055, 0.004]);
+export const [, , ROCKS2_XFORM] = initPositions(119, 0.72, 25, 0, [0.006, 0.004]);
+export const [, , ROCKS3_XFORM] = initPositions(60, 0.75, 60, 0, [0.012, 0.004]); // outer, large, non-floating
+export const [, , ROCKS4_XFORM] = initPositions(40, 0, 10, 0, [0.0055, 0.004]); // central tall floating
+export const [, , ROCKS5_XFORM] = initPositions(70, 0, 300, 0, [0.0055, 0.004]); // central non-floating
+export const [, , TREES_XFORM] = initPositions(1360, 0.0, 60, 0, [0.003, 0.003]);
+
+export const [ROCKS1_TEXTURE, ROCKS1_COUNT] = initPositions(97, 0.7, 23);
 export const [ROCKS2_TEXTURE, ROCKS2_COUNT] = initPositions(119, 0.72, 25);
 export const [ROCKS3_TEXTURE, ROCKS3_COUNT] = initPositions(60, 0.75, 60); // outer, large, non-floating
 export const [ROCKS4_TEXTURE, ROCKS4_COUNT] = initPositions(40, 0, 10); // central tall floating
 export const [ROCKS5_TEXTURE, ROCKS5_COUNT] = initPositions(70, 0, 30); // central non-floating
-export const [PARTICLES_TEXTURE, PARTICLES_COUNT] = initPositions(40, 0.0, 40);
-
-export const [ROCKS1_TEXTURE, ROCKS1_COUNT, ROCKS1_XFORM] = initPositions(97, 0.7, 23, 0, [0.0055, 0.004]);
-export const [TREES_TEXTURE, TREES_COUNT, TREES_XFORM] = initPositions(1360, 0.0, 60, 0, [0.003, 0.003]);
+export const [TREES_TEXTURE, TREES_COUNT] = initPositions(1360, 0.0, 60);
 
 const birds1 = new CameraPositionInterpolator();
 birds1.reverse = true;

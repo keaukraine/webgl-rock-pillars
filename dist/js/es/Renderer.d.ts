@@ -33,6 +33,11 @@ export declare class Renderer extends BaseRenderer {
     private textureWhite;
     private bufferTreesMatrices;
     private bufferRocks1Matrices;
+    private bufferRocks2Matrices;
+    private bufferRocks3Matrices;
+    private bufferRocks4Matrices;
+    private bufferRocks5Matrices;
+    protected extBVBI: any;
     private fboOffscreen;
     private mQuadTriangles;
     private mTriangleVerticesVignette;
@@ -42,9 +47,6 @@ export declare class Renderer extends BaseRenderer {
     private shaderBirds;
     private shaderFogVertexLitGrass;
     private shaderFogSprite;
-    private shaderInstanced;
-    private shaderInstancedColored;
-    private shaderInstancedFog;
     private shaderInstancedFogAt;
     private shaderInstancedRocks;
     private animationBird;
@@ -120,6 +122,8 @@ export declare class Renderer extends BaseRenderer {
     private drawSceneObjects;
     private drawClouds;
     private drawRocks;
+    private drawRocksWithTextures;
+    private drawRocksBvbi;
     private drawInstances;
     private drawInstances2;
     private drawCloudModels;
