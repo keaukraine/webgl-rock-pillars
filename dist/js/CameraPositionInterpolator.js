@@ -51,7 +51,7 @@ class CameraPositionInterpolator {
         }
         const start = this.position.start.position;
         const end = this.position.end.position;
-        return Math.sqrt((end[0] - start[0]) ** 2 + (end[1] - start[1]) ** 2 + (end[2] - start[2]) ** 2);
+        return Math.sqrt(Math.pow((end[0] - start[0]), 2) + Math.pow((end[1] - start[1]), 2) + Math.pow((end[2] - start[2]), 2));
     }
     iterate(timeNow) {
         if (this.lastTime != 0) {
