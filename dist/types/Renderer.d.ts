@@ -31,6 +31,13 @@ export declare class Renderer extends BaseRenderer {
     private textureFern;
     private textureCloud;
     private textureWhite;
+    private bufferTreesMatrices;
+    private bufferRocks1Matrices;
+    private bufferRocks2Matrices;
+    private bufferRocks3Matrices;
+    private bufferRocks4Matrices;
+    private bufferRocks5Matrices;
+    protected extBvbi: any;
     private fboOffscreen;
     private mQuadTriangles;
     private mTriangleVerticesVignette;
@@ -40,6 +47,8 @@ export declare class Renderer extends BaseRenderer {
     private shaderBirds;
     private shaderFogVertexLitGrass;
     private shaderFogSprite;
+    private shaderInstancedFogAt;
+    private shaderInstancedRocks;
     private animationBird;
     private customCamera;
     private Z_NEAR;
@@ -113,7 +122,10 @@ export declare class Renderer extends BaseRenderer {
     private drawSceneObjects;
     private drawClouds;
     private drawRocks;
+    private drawRocksWithTextures;
+    private drawRocksBvbi;
     private drawInstances;
+    private drawInstances2;
     private drawCloudModels;
     private drawBirds;
     private drawBirdsFlock;

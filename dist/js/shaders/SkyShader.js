@@ -43,6 +43,7 @@ class SkyShader extends webgl_framework_1.BaseShader {
         // gl.enableVertexAttribArray(this.rm_TexCoord0);
         gl.vertexAttribPointer(this.rm_Vertex, 3, gl.FLOAT, false, 4 * (3 + 2), 0);
         // gl.vertexAttribPointer(this.rm_TexCoord0, 2, gl.FLOAT, false, 4 * (3 + 2), 4 * 3);
+        // gl.vertexAttribDivisor(this.rm_Vertex, 0);
         renderer.calculateMVPMatrix(tx, ty, tz, rx, ry, rz, sx, sy, sz);
         gl.uniformMatrix4fv(this.view_proj_matrix, false, renderer.getMVPMatrix());
         gl.uniformMatrix4fv(this.view_matrix, false, renderer.getViewMatrix());

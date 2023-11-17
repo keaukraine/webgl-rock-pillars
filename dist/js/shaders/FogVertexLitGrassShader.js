@@ -77,6 +77,7 @@ class FogVertexLitGrassShader extends FogVertexLitShader_1.FogVertexLitShader {
                 vec4 mixed = mix(rock, grass, vGrass);
                 vec4 diffuse = mixed * vDiffuseColor;
                 fragColor = mix(diffuse, fogColor, fogAmount);
+                // fragColor.rgb = texCoord;
             }`;
     }
     fillUniformsAttributes() {

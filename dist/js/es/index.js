@@ -1,5 +1,3 @@
-
-(function(l, r) { if (l.getElementById('livereloadscript')) return; r = l.createElement('script'); r.async = 1; r.src = '//' + (window.location.host || 'localhost').split(':')[0] + ':35729/livereload.js?snipver=1'; r.id = 'livereloadscript'; l.getElementsByTagName('head')[0].appendChild(r) })(window.document);
 class FullScreenUtils {
     /** Enters fullscreen. */
     enterFullScreen() {
@@ -3728,7 +3726,6 @@ class InstancedShader extends BaseShader {
     }
     /** @inheritdoc */
     drawModel(renderer, model, bufferMatrices) {
-        // throw new Error("Not implemented");
         if (this.rm_Vertex === undefined
             || this.rm_TexCoord0 === undefined
             || this.modelMatrix === undefined) {
@@ -3741,7 +3738,6 @@ class InstancedShader extends BaseShader {
         gl.vertexAttribPointer(this.rm_Vertex, 3, gl.HALF_FLOAT, false, 12, 0);
         gl.vertexAttribPointer(this.rm_TexCoord0, 2, gl.HALF_FLOAT, false, 12, 6);
         gl.bindBuffer(gl.ARRAY_BUFFER, bufferMatrices);
-        // gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
         // set all 4 attributes for matrix
         const bytesPerMatrix = 4 * 16;
         for (let i = 0; i < 4; ++i) {
@@ -3757,11 +3753,7 @@ class InstancedShader extends BaseShader {
             offset);
             // this line says this attribute only changes for each 1 instance
             gl.vertexAttribDivisor(loc, 1);
-            // TODO: this also breaks rendering of all other (non-instanced) objects
         }
-        // gl.vertexAttribDivisor(this.rm_Vertex, 0);
-        // gl.vertexAttribDivisor(this.rm_TexCoord0, 0);
-        // renderer.calculateMVPMatrix(0, 0, 0, 0, 0, 0, 1, 1, 1);
         gl.uniformMatrix4fv(this.viewMatrix, false, renderer.getViewMatrix());
         gl.uniformMatrix4fv(this.projMatrix, false, renderer.getProjectionMatrix());
         gl.drawElements(gl.TRIANGLES, model.getNumIndices() * 3, gl.UNSIGNED_SHORT, 0);
@@ -3859,15 +3851,12 @@ class InstancedShader extends BaseShader {
     }
 }
 InstancedShader.COMMON_UNIFORMS_ATTRIBUTES = `
-    uniform mat4 viewMatrix;
-    uniform mat4 projMatrix;
-    in mat4 modelMatrix;
+        uniform mat4 viewMatrix;
+        uniform mat4 projMatrix;
+        in mat4 modelMatrix;
     `;
 InstancedShader.COMMON_TRANSFORMS = `
-    // mat4 view_proj_matrix = modelMatrix * viewMatrix * projMatrix;
-    // mat4 view_proj_matrix = viewMatrix * modelMatrix * projMatrix; // as in calculateMVPMatrix()
-    mat4 view_proj_matrix = projMatrix * viewMatrix * modelMatrix;
-    // gl_Position = ProjectionMatrix * ViewMatrix * ModelMatrix * vec4(position, 1.0);
+        mat4 view_proj_matrix = projMatrix * viewMatrix * modelMatrix;
     `;
 
 class InstancedColoredShader extends InstancedShader {
@@ -3910,7 +3899,6 @@ class FogInstancedShader extends InstancedColoredShader {
                 // modelMatrix[0][1] is sine of model rotation angle
                 vertex.z += modelMatrix[0][1] * heightOffset.x + heightOffset.y;
 
-                // gl_Position = view_proj_matrix * vertex;
                 gl_Position = projMatrix * viewMatrix * vertex;
                 vTexCoord = rm_TexCoord0;
 
@@ -3930,8 +3918,6 @@ class FogInstancedShader extends InstancedColoredShader {
                 ${FogInstancedShader.FOG_FRAGMENT_MAIN}
                 vec4 diffuse = texture(sTexture, vTexCoord) * color;
                 fragColor = mix(diffuse, fogColor, fogAmount);
-                // fragColor.rgb = texCoord;
-                // fragColor.r = 1.;
             }`;
     }
     fillUniformsAttributes() {
@@ -4268,8 +4254,8 @@ class Renderer extends BaseRenderer {
         this.shaderSky = new SkyShader(this.gl);
         this.shaderBirds = new BirdsShader(this.gl);
         this.shaderFogSprite = new FogSpriteShader(this.gl);
-        this.extBVBI = this.gl.getExtension("WEBGL_multi_draw_instanced_base_vertex_base_instance");
-        if (this.extBVBI) {
+        this.extBvbi = this.gl.getExtension("WEBGL_multi_draw_instanced_base_vertex_base_instance");
+        if (this.extBvbi) {
             console.log("Base vertex base index is available.");
             this.shaderInstancedFogAt = new FogInstancedAtShader(this.gl);
             this.shaderInstancedRocks = new FogInstancedVertexLitGrassShader(this.gl);
@@ -4336,7 +4322,7 @@ class Renderer extends BaseRenderer {
                 this.fmSmoke.load("data/models/cloud", this.gl),
             ]);
             const loadPositionsTexture = (texture, count) => this.loadFp32Texture(texture, this.gl, count, 2, this.gl.NEAREST, this.gl.NEAREST, true, 3);
-            if (this.extBVBI) {
+            if (this.extBvbi) {
                 this.bufferTreesMatrices = gl.createBuffer();
                 gl.bindBuffer(gl.ARRAY_BUFFER, this.bufferTreesMatrices);
                 gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(TREES_XFORM), gl.STATIC_DRAW);
@@ -4364,7 +4350,6 @@ class Renderer extends BaseRenderer {
                 this.textureRocksPositions5 = loadPositionsTexture(ROCKS5_TEXTURE, ROCKS5_COUNT);
                 this.textureTreesPositions = loadPositionsTexture(TREES_TEXTURE, TREES_COUNT);
             }
-            // console.log(ROCKS1_TEXTURE.byteLength, ROCKS1_XFORM.length * 4, ROCKS1_XFORM.length * 0.75 * 4);
             [
                 this.textureRocks,
                 this.textureTrees,
@@ -4590,7 +4575,7 @@ class Renderer extends BaseRenderer {
         this.drawCloudModels(shader, this.fmSmoke, PARTICLES_TEXTURE, PARTICLES_COUNT, this.config.cloudsScale, 0, [0, 0, 12]);
     }
     drawRocks() {
-        if (this.extBVBI) {
+        if (this.extBvbi) {
             this.drawRocksBvbi();
         }
         else {

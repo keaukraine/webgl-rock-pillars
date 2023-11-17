@@ -25,9 +25,7 @@ import { SkyShader } from "./shaders/SkyShader";
 import { BirdsShader } from "./shaders/BirdsShader";
 import { FogVertexLitGrassShader } from "./shaders/FogVertexLitGrassShader";
 import { FogSpriteShader } from "./shaders/FogSpriteShader";
-import { IInstancedShader, InstancedShader } from "./shaders/InstancedShader";
-import { InstancedColoredShader } from "./shaders/InstancedColoredShader";
-import { FogInstancedShader } from "./shaders/FogInstancedShader";
+import { IInstancedShader } from "./shaders/InstancedShader";
 import { FogInstancedAtShader } from "./shaders/FogInstancedAtShader";
 import { FogInstancedVertexLitGrassShader } from "./shaders/FogInstancedVertexLitGrassShader";
 
@@ -77,7 +75,7 @@ export class Renderer extends BaseRenderer {
     private bufferRocks4Matrices: WebGLBuffer | null = null;
     private bufferRocks5Matrices: WebGLBuffer | null = null;
 
-    protected extBVBI: any;
+    protected extBvbi: any;
 
     private fboOffscreen: FrameBuffer | undefined;
 
@@ -226,8 +224,8 @@ export class Renderer extends BaseRenderer {
         this.shaderBirds = new BirdsShader(this.gl);
         this.shaderFogSprite = new FogSpriteShader(this.gl);
 
-        this.extBVBI = this.gl.getExtension("WEBGL_multi_draw_instanced_base_vertex_base_instance");
-        if (this.extBVBI) {
+        this.extBvbi = this.gl.getExtension("WEBGL_multi_draw_instanced_base_vertex_base_instance");
+        if (this.extBvbi) {
             console.log("Base vertex base index is available.");
             this.shaderInstancedFogAt = new FogInstancedAtShader(this.gl);
             this.shaderInstancedRocks = new FogInstancedVertexLitGrassShader(this.gl);
@@ -317,7 +315,7 @@ export class Renderer extends BaseRenderer {
             3
         );
 
-        if (this.extBVBI) {
+        if (this.extBvbi) {
             this.bufferTreesMatrices = gl.createBuffer();
             gl.bindBuffer(gl.ARRAY_BUFFER, this.bufferTreesMatrices);
             gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(TREES_XFORM), gl.STATIC_DRAW);
@@ -344,8 +342,6 @@ export class Renderer extends BaseRenderer {
             this.textureRocksPositions5 = loadPositionsTexture(ROCKS5_TEXTURE, ROCKS5_COUNT);
             this.textureTreesPositions = loadPositionsTexture(TREES_TEXTURE, TREES_COUNT);
         }
-
-        // console.log(ROCKS1_TEXTURE.byteLength, ROCKS1_XFORM.length * 4, ROCKS1_XFORM.length * 0.75 * 4);
 
         [
             this.textureRocks,
@@ -632,7 +628,7 @@ export class Renderer extends BaseRenderer {
     }
 
     private drawRocks(): void {
-        if (this.extBVBI) {
+        if (this.extBvbi) {
             this.drawRocksBvbi();
         } else {
             this.drawRocksWithTextures();

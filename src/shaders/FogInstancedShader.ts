@@ -68,7 +68,6 @@ export class FogInstancedShader extends InstancedColoredShader {
                 // modelMatrix[0][1] is sine of model rotation angle
                 vertex.z += modelMatrix[0][1] * heightOffset.x + heightOffset.y;
 
-                // gl_Position = view_proj_matrix * vertex;
                 gl_Position = projMatrix * viewMatrix * vertex;
                 vTexCoord = rm_TexCoord0;
 
@@ -89,8 +88,6 @@ export class FogInstancedShader extends InstancedColoredShader {
                 ${FogInstancedShader.FOG_FRAGMENT_MAIN}
                 vec4 diffuse = texture(sTexture, vTexCoord) * color;
                 fragColor = mix(diffuse, fogColor, fogAmount);
-                // fragColor.rgb = texCoord;
-                // fragColor.r = 1.;
             }`;
     }
 

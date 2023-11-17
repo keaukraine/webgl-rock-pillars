@@ -1,0 +1,1 @@
+{"version":3,"file":"FogInstancedAtShader.js","sourceRoot":"","sources":["../../../src/shaders/FogInstancedAtShader.ts"],"names":[],"mappings":";;;AAAA,6DAA0D;AAE1D,MAAa,oBAAqB,SAAQ,uCAAkB;IACxD,QAAQ;QACJ,KAAK,CAAC,QAAQ,EAAE,CAAC;QAEjB,IAAI,CAAC,kBAAkB,GAAG;;;;;;;;cAQpB,uCAAkB,CAAC,8BAA8B;;;kBAG7C,uCAAkB,CAAC,iBAAiB;;;;;;;cAOxC,CAAC;IACX,CAAC;CACJ;AAxBD,oDAwBC"}

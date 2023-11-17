@@ -1,8 +1,9 @@
 "use strict";
-var _a, _b, _c, _d, _e, _f, _g;
+var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o;
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.BIRD_PATHS = exports.PARTICLES_COUNT = exports.PARTICLES_TEXTURE = exports.TREES_COUNT = exports.TREES_TEXTURE = exports.ROCKS5_COUNT = exports.ROCKS5_TEXTURE = exports.ROCKS4_COUNT = exports.ROCKS4_TEXTURE = exports.ROCKS3_COUNT = exports.ROCKS3_TEXTURE = exports.ROCKS2_COUNT = exports.ROCKS2_TEXTURE = exports.ROCKS1_COUNT = exports.ROCKS1_TEXTURE = exports.positionOnBirdsSpline = exports.addPositions = exports.positionOnSpline = void 0;
+exports.BIRD_PATHS = exports.TREES_COUNT = exports.TREES_TEXTURE = exports.ROCKS5_COUNT = exports.ROCKS5_TEXTURE = exports.ROCKS4_COUNT = exports.ROCKS4_TEXTURE = exports.ROCKS3_COUNT = exports.ROCKS3_TEXTURE = exports.ROCKS2_COUNT = exports.ROCKS2_TEXTURE = exports.ROCKS1_COUNT = exports.ROCKS1_TEXTURE = exports.TREES_XFORM = exports.ROCKS5_XFORM = exports.ROCKS4_XFORM = exports.ROCKS3_XFORM = exports.ROCKS2_XFORM = exports.ROCKS1_XFORM = exports.PARTICLES_COUNT = exports.PARTICLES_TEXTURE = exports.positionOnBirdsSpline = exports.addPositions = exports.positionOnSpline = void 0;
 const CameraPositionInterpolator_1 = require("./CameraPositionInterpolator");
+const gl_matrix_1 = require("gl-matrix");
 const mainRadius = 120;
 const spikeLength1 = 16;
 const spikeLength2 = 3;
@@ -13,6 +14,16 @@ const numSpikesZ2 = 8;
 const splineAmplitudeZ1 = 1;
 const splineAmplitudeZ2 = 3;
 const cameraHeightOffset = 7;
+const matrixTemp = gl_matrix_1.mat4.create();
+const calculateModelMatrix = (tx, ty, tz, rx, ry, rz, sx, sy, sz) => {
+    gl_matrix_1.mat4.identity(matrixTemp);
+    gl_matrix_1.mat4.rotate(matrixTemp, matrixTemp, 0, [1, 0, 0]);
+    gl_matrix_1.mat4.translate(matrixTemp, matrixTemp, [tx, ty, tz]);
+    gl_matrix_1.mat4.scale(matrixTemp, matrixTemp, [sx, sy, sz]);
+    gl_matrix_1.mat4.rotateX(matrixTemp, matrixTemp, rx);
+    gl_matrix_1.mat4.rotateY(matrixTemp, matrixTemp, ry);
+    gl_matrix_1.mat4.rotateZ(matrixTemp, matrixTemp, rz);
+};
 const transientSplinePosition = [0, 0, 0];
 function positionOnSpline(i, radiusOffset, out) {
     const a = Math.PI * 2 * i;
@@ -52,23 +63,30 @@ function addPositions(positions, instances, minDistance, offset) {
 }
 exports.addPositions = addPositions;
 let positions = [];
-function initPositions(instances, minDistance, offset) {
+function initPositions(instances, minDistance, offset, heightOffset = 0, scales = [0, 1]) {
     positions = [];
+    const matrices = [];
     addPositions(positions, instances, minDistance, offset); // further from spline
     const texture = new Float32Array(positions.length * 6);
     for (let i = 0; i < positions.length; i++) {
-        const [x, y, z] = positions[i];
+        let [x, y, z] = positions[i];
+        z = heightOffset;
+        // const scale = 0.003 + Math.random() * 0.003;
+        const scale = scales[0] + Math.random() * scales[1];
         texture[i * 3 + 0] = x; // translation X
         texture[i * 3 + 1] = y; // translation Y
-        texture[i * 3 + 2] = Math.random(); // scale
+        texture[i * 3 + 2] = scale; // scale
         const a = Math.random() * Math.PI * 2;
         texture[i * 3 + 0 + positions.length * 3] = Math.sin(a); // rotation sin
         texture[i * 3 + 1 + positions.length * 3] = Math.cos(a); // rotation cos
         texture[i * 3 + 2 + positions.length * 3] = 0;
+        calculateModelMatrix(x, y, z, 0, 0, a, scale, scale, scale);
+        matrices.push([...matrixTemp]);
     }
     return [
         texture,
-        positions.length
+        positions.length,
+        matrices.flat() // FIXME
     ];
 }
 const transientBirdsPosition = [0, 0, 0];
@@ -88,13 +106,19 @@ function positionOnBirdsSpline(i) {
 }
 exports.positionOnBirdsSpline = positionOnBirdsSpline;
 ;
-_a = initPositions(97, 0.7, 23), exports.ROCKS1_TEXTURE = _a[0], exports.ROCKS1_COUNT = _a[1];
-_b = initPositions(119, 0.72, 25), exports.ROCKS2_TEXTURE = _b[0], exports.ROCKS2_COUNT = _b[1];
-_c = initPositions(60, 0.75, 60), exports.ROCKS3_TEXTURE = _c[0], exports.ROCKS3_COUNT = _c[1]; // outer, large, non-floating
-_d = initPositions(40, 0, 10), exports.ROCKS4_TEXTURE = _d[0], exports.ROCKS4_COUNT = _d[1]; // central tall floating
-_e = initPositions(70, 0, 30), exports.ROCKS5_TEXTURE = _e[0], exports.ROCKS5_COUNT = _e[1]; // central non-floating
-_f = initPositions(1360, 0.0, 60), exports.TREES_TEXTURE = _f[0], exports.TREES_COUNT = _f[1];
-_g = initPositions(40, 0.0, 40), exports.PARTICLES_TEXTURE = _g[0], exports.PARTICLES_COUNT = _g[1];
+_a = initPositions(40, 0.0, 40), exports.PARTICLES_TEXTURE = _a[0], exports.PARTICLES_COUNT = _a[1];
+_b = initPositions(97, 0.7, 23, 0, [0.0055, 0.004]), exports.ROCKS1_XFORM = _b[2];
+_c = initPositions(119, 0.72, 25, 0, [0.006, 0.004]), exports.ROCKS2_XFORM = _c[2];
+_d = initPositions(60, 0.75, 60, 0, [0.012, 0.004]), exports.ROCKS3_XFORM = _d[2]; // outer, large, non-floating
+_e = initPositions(40, 0, 10, 0, [0.0055, 0.004]), exports.ROCKS4_XFORM = _e[2]; // central tall floating
+_f = initPositions(70, 0, 300, 0, [0.0055, 0.004]), exports.ROCKS5_XFORM = _f[2]; // central non-floating
+_g = initPositions(1360, 0.0, 60, 0, [0.003, 0.003]), exports.TREES_XFORM = _g[2];
+_h = initPositions(97, 0.7, 23), exports.ROCKS1_TEXTURE = _h[0], exports.ROCKS1_COUNT = _h[1];
+_j = initPositions(119, 0.72, 25), exports.ROCKS2_TEXTURE = _j[0], exports.ROCKS2_COUNT = _j[1];
+_k = initPositions(60, 0.75, 60), exports.ROCKS3_TEXTURE = _k[0], exports.ROCKS3_COUNT = _k[1]; // outer, large, non-floating
+_l = initPositions(40, 0, 10), exports.ROCKS4_TEXTURE = _l[0], exports.ROCKS4_COUNT = _l[1]; // central tall floating
+_m = initPositions(70, 0, 30), exports.ROCKS5_TEXTURE = _m[0], exports.ROCKS5_COUNT = _m[1]; // central non-floating
+_o = initPositions(1360, 0.0, 60), exports.TREES_TEXTURE = _o[0], exports.TREES_COUNT = _o[1];
 const birds1 = new CameraPositionInterpolator_1.CameraPositionInterpolator();
 birds1.reverse = true;
 birds1.speed = 1000;

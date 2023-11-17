@@ -37,7 +37,7 @@ export declare class Renderer extends BaseRenderer {
     private bufferRocks3Matrices;
     private bufferRocks4Matrices;
     private bufferRocks5Matrices;
-    protected extBVBI: any;
+    protected extBvbi: any;
     private fboOffscreen;
     private mQuadTriangles;
     private mTriangleVerticesVignette;
