@@ -1,3 +1,5 @@
+
+(function(l, r) { if (l.getElementById('livereloadscript')) return; r = l.createElement('script'); r.async = 1; r.src = '//' + (window.location.host || 'localhost').split(':')[0] + ':35729/livereload.js?snipver=1'; r.id = 'livereloadscript'; l.getElementsByTagName('head')[0].appendChild(r) })(window.document);
 class FullScreenUtils {
     /** Enters fullscreen. */
     enterFullScreen() {
@@ -2805,7 +2807,15 @@ function initPositions(instances, minDistance, offset, heightOffset = 0, scales 
         texture[i * 3 + 1 + positions.length * 3] = Math.cos(a); // rotation cos
         texture[i * 3 + 2 + positions.length * 3] = 0;
         calculateModelMatrix(x, y, z, 0, 0, a, scale, scale, scale);
-        matrices.push([...matrixTemp]);
+        const mat4x3 = [
+            matrixTemp[0], matrixTemp[1], matrixTemp[2], matrixTemp[3],
+            matrixTemp[4], matrixTemp[5], matrixTemp[6], matrixTemp[7],
+            matrixTemp[8], matrixTemp[9], matrixTemp[10], matrixTemp[11],
+            matrixTemp[12], matrixTemp[13], matrixTemp[14], matrixTemp[15]
+        ];
+        console.log([...mat4x3]);
+        // mat4x3.length = 12;
+        matrices.push([...mat4x3]);
     }
     return [
         texture,
@@ -3739,8 +3749,8 @@ class InstancedShader extends BaseShader {
         gl.vertexAttribPointer(this.rm_TexCoord0, 2, gl.HALF_FLOAT, false, 12, 6);
         gl.bindBuffer(gl.ARRAY_BUFFER, bufferMatrices);
         // set all 4 attributes for matrix
-        const bytesPerMatrix = 4 * 16;
-        for (let i = 0; i < 4; ++i) {
+        const bytesPerMatrix = 3 * 16;
+        for (let i = 0; i < 3; ++i) {
             const loc = this.modelMatrix + i;
             gl.enableVertexAttribArray(loc);
             // note the stride and offset
@@ -3778,8 +3788,8 @@ class InstancedShader extends BaseShader {
         gl.vertexAttribPointer(this.rm_TexCoord0, 2, gl.HALF_FLOAT, false, 12, 6);
         gl.bindBuffer(gl.ARRAY_BUFFER, bufferMatrices);
         // set all 4 attributes for matrix
-        const bytesPerMatrix = 4 * 16;
-        for (let i = 0; i < 4; ++i) {
+        const bytesPerMatrix = 3 * 16;
+        for (let i = 0; i < 3; ++i) {
             const loc = this.modelMatrix + i;
             gl.enableVertexAttribArray(loc);
             // note the stride and offset
@@ -3819,8 +3829,8 @@ class InstancedShader extends BaseShader {
         gl.vertexAttribPointer(this.rm_TexCoord0, 2, gl.HALF_FLOAT, false, 12, 6);
         gl.bindBuffer(gl.ARRAY_BUFFER, bufferMatrices);
         // set all 4 attributes for matrix
-        const bytesPerMatrix = 4 * 16;
-        for (let i = 0; i < 4; ++i) {
+        const bytesPerMatrix = 3 * 16;
+        for (let i = 0; i < 3; ++i) {
             const loc = this.modelMatrix + i;
             gl.enableVertexAttribArray(loc);
             // note the stride and offset
@@ -3843,7 +3853,7 @@ class InstancedShader extends BaseShader {
         const baseVertex = 0;
         this.extBvbi.drawElementsInstancedBaseVertexBaseInstanceWEBGL(gl.TRIANGLES, count, gl.UNSIGNED_SHORT, offset, instanceCount, baseVertex, baseInstance);
         // Reset attrib divisor for matrix attribs
-        for (let i = 0; i < 4; ++i) {
+        for (let i = 0; i < 3; ++i) {
             const loc = this.modelMatrix + i;
             gl.vertexAttribDivisor(loc, 0);
         }
@@ -3853,10 +3863,11 @@ class InstancedShader extends BaseShader {
 InstancedShader.COMMON_UNIFORMS_ATTRIBUTES = `
         uniform mat4 viewMatrix;
         uniform mat4 projMatrix;
-        in mat4 modelMatrix;
+        in mat4x3 modelMatrix;
     `;
 InstancedShader.COMMON_TRANSFORMS = `
-        mat4 view_proj_matrix = projMatrix * viewMatrix * modelMatrix;
+        mat4 modelMatrix4 = mat4(modelMatrix);
+        mat4 view_proj_matrix = projMatrix * viewMatrix * modelMatrix4;
     `;
 
 class InstancedColoredShader extends InstancedShader {
@@ -3894,10 +3905,11 @@ class FogInstancedShader extends InstancedColoredShader {
             ${FogInstancedShader.FOG_VERTEX_UNIFORMS_VARYINGS}
 
             void main(void) {
-                vec4 vertex = modelMatrix * rm_Vertex;
+                mat4 modelMatrix4 = mat4(modelMatrix);
+                vec4 vertex = modelMatrix4 * rm_Vertex;
                 // GLSL is column-major: mat[col][row]
                 // modelMatrix[0][1] is sine of model rotation angle
-                vertex.z += modelMatrix[0][1] * heightOffset.x + heightOffset.y;
+                vertex.z += modelMatrix4[0][1] * heightOffset.x + heightOffset.y;
 
                 gl_Position = projMatrix * viewMatrix * vertex;
                 vTexCoord = rm_TexCoord0;
@@ -4014,17 +4026,18 @@ class FogInstancedVertexLitGrassShader extends FogInstancedShader {
             uniform float grassAmount;
 
             void main(void) {
-                vec4 vertex = modelMatrix * rm_Vertex;
+                mat4 modelMatrix4 = mat4(modelMatrix);
+                vec4 vertex = modelMatrix4 * rm_Vertex;
                 // GLSL is column-major: mat[col][row]
                 // modelMatrix[0][1] is sine of model rotation angle
-                vertex.z += modelMatrix[0][1] * heightOffset.x + heightOffset.y;
+                vertex.z += modelMatrix4[0][1] * heightOffset.x + heightOffset.y;
 
                 gl_Position = projMatrix * viewMatrix * vertex;
                 vTexCoord = rm_TexCoord0;
 
                 ${FogInstancedShader.FOG_VERTEX_MAIN}
 
-                vec4 normal = normalize(modelMatrix * vec4(rm_Normal, 0.0));
+                vec4 normal = normalize(modelMatrix4 * vec4(rm_Normal, 0.0));
 
                 float d = pow(max(0.0, dot(normal, lightDir)), diffuseExponent);
 

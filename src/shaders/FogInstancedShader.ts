@@ -63,10 +63,11 @@ export class FogInstancedShader extends InstancedColoredShader {
             ${FogInstancedShader.FOG_VERTEX_UNIFORMS_VARYINGS}
 
             void main(void) {
-                vec4 vertex = modelMatrix * rm_Vertex;
+                mat4 modelMatrix4 = mat4(modelMatrix);
+                vec4 vertex = modelMatrix4 * rm_Vertex;
                 // GLSL is column-major: mat[col][row]
                 // modelMatrix[0][1] is sine of model rotation angle
-                vertex.z += modelMatrix[0][1] * heightOffset.x + heightOffset.y;
+                vertex.z += modelMatrix4[0][1] * heightOffset.x + heightOffset.y;
 
                 gl_Position = projMatrix * viewMatrix * vertex;
                 vTexCoord = rm_TexCoord0;

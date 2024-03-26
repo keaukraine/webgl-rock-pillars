@@ -11,8 +11,8 @@ export declare class InstancedShader extends BaseShader implements IInstancedSha
     rm_Vertex: number | undefined;
     rm_TexCoord0: number | undefined;
     protected extBvbi: any;
-    static readonly COMMON_UNIFORMS_ATTRIBUTES = "\n        uniform mat4 viewMatrix;\n        uniform mat4 projMatrix;\n        in mat4 modelMatrix;\n    ";
-    static readonly COMMON_TRANSFORMS = "\n        mat4 view_proj_matrix = projMatrix * viewMatrix * modelMatrix;\n    ";
+    static readonly COMMON_UNIFORMS_ATTRIBUTES = "\n        uniform mat4 viewMatrix;\n        uniform mat4 projMatrix;\n        in mat4x3 modelMatrix;\n    ";
+    static readonly COMMON_TRANSFORMS = "\n        mat4 modelMatrix4 = mat4(modelMatrix);\n        mat4 view_proj_matrix = projMatrix * viewMatrix * modelMatrix4;\n    ";
     fillCode(): void;
     fillUniformsAttributes(): void;
     constructor(gl: WebGLRenderingContext | WebGL2RenderingContext);

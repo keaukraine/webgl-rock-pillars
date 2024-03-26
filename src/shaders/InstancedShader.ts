@@ -26,11 +26,12 @@ export class InstancedShader extends BaseShader implements IInstancedShader {
     static readonly COMMON_UNIFORMS_ATTRIBUTES = `
         uniform mat4 viewMatrix;
         uniform mat4 projMatrix;
-        in mat4 modelMatrix;
+        in mat4x3 modelMatrix;
     `;
 
     static readonly COMMON_TRANSFORMS = `
-        mat4 view_proj_matrix = projMatrix * viewMatrix * modelMatrix;
+        mat4 modelMatrix4 = mat4(modelMatrix);
+        mat4 view_proj_matrix = projMatrix * viewMatrix * modelMatrix4;
     `;
 
     fillCode() {
@@ -103,8 +104,8 @@ export class InstancedShader extends BaseShader implements IInstancedShader {
 
         gl.bindBuffer(gl.ARRAY_BUFFER, bufferMatrices);
         // set all 4 attributes for matrix
-        const bytesPerMatrix = 4 * 16;
-        for (let i = 0; i < 4; ++i) {
+        const bytesPerMatrix = 3 * 16;
+        for (let i = 0; i < 3; ++i) {
             const loc = this.modelMatrix + i;
             gl.enableVertexAttribArray(loc);
             // note the stride and offset
@@ -159,8 +160,8 @@ export class InstancedShader extends BaseShader implements IInstancedShader {
 
         gl.bindBuffer(gl.ARRAY_BUFFER, bufferMatrices);
         // set all 4 attributes for matrix
-        const bytesPerMatrix = 4 * 16;
-        for (let i = 0; i < 4; ++i) {
+        const bytesPerMatrix = 3 * 16;
+        for (let i = 0; i < 3; ++i) {
             const loc = this.modelMatrix + i;
             gl.enableVertexAttribArray(loc);
             // note the stride and offset
@@ -219,8 +220,8 @@ export class InstancedShader extends BaseShader implements IInstancedShader {
 
         gl.bindBuffer(gl.ARRAY_BUFFER, bufferMatrices);
         // set all 4 attributes for matrix
-        const bytesPerMatrix = 4 * 16;
-        for (let i = 0; i < 4; ++i) {
+        const bytesPerMatrix = 3 * 16;
+        for (let i = 0; i < 3; ++i) {
             const loc = this.modelMatrix + i;
             gl.enableVertexAttribArray(loc);
             // note the stride and offset
@@ -251,7 +252,7 @@ export class InstancedShader extends BaseShader implements IInstancedShader {
             offset, instanceCount, baseVertex, baseInstance);
 
         // Reset attrib divisor for matrix attribs
-        for (let i = 0; i < 4; ++i) {
+        for (let i = 0; i < 3; ++i) {
             const loc = this.modelMatrix + i;
             gl.vertexAttribDivisor(loc, 0);
         }

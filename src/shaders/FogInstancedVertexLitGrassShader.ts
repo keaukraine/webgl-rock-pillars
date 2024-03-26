@@ -32,17 +32,18 @@ export class FogInstancedVertexLitGrassShader extends FogInstancedShader {
             uniform float grassAmount;
 
             void main(void) {
-                vec4 vertex = modelMatrix * rm_Vertex;
+                mat4 modelMatrix4 = mat4(modelMatrix);
+                vec4 vertex = modelMatrix4 * rm_Vertex;
                 // GLSL is column-major: mat[col][row]
                 // modelMatrix[0][1] is sine of model rotation angle
-                vertex.z += modelMatrix[0][1] * heightOffset.x + heightOffset.y;
+                vertex.z += modelMatrix4[0][1] * heightOffset.x + heightOffset.y;
 
                 gl_Position = projMatrix * viewMatrix * vertex;
                 vTexCoord = rm_TexCoord0;
 
                 ${FogInstancedShader.FOG_VERTEX_MAIN}
 
-                vec4 normal = normalize(modelMatrix * vec4(rm_Normal, 0.0));
+                vec4 normal = normalize(modelMatrix4 * vec4(rm_Normal, 0.0));
 
                 float d = pow(max(0.0, dot(normal, lightDir)), diffuseExponent);
 

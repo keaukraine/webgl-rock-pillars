@@ -104,7 +104,15 @@ function initPositions(
             0, 0, a,
             scale, scale, scale
         );
-        matrices.push([...matrixTemp]);
+        const mat4x3 = [
+            matrixTemp[0], matrixTemp[1], matrixTemp[2], matrixTemp[3],
+            matrixTemp[4], matrixTemp[5], matrixTemp[6], matrixTemp[7],
+            matrixTemp[8], matrixTemp[9], matrixTemp[10], matrixTemp[11],
+            matrixTemp[12], matrixTemp[13], matrixTemp[14], matrixTemp[15]
+        ];
+        console.log([...mat4x3]);
+        // mat4x3.length = 12;
+        matrices.push([...mat4x3]);
     }
 
     return [
